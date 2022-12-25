@@ -1,2 +1,5 @@
 fastapi
 uvicorn
+python-multipart  # for images
+anyscale
+pyyaml
