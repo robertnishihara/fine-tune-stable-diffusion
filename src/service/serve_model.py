@@ -73,7 +73,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--test", action="store_true")
 args = parser.parse_args()
 
-if args.test:
+print("FORCING TEST MODE")
+if args.test or True:
     entrypoint = APIIngress.bind(SimpleDiffusion.bind())
     serve.run(entrypoint, port=8001)
     import time

@@ -7,18 +7,24 @@ How to test:
 """
 # dumb basic storage
 import dbm
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, UploadFile, HTTPException
 from fastapi.responses import Response
 
+from anyscale.sdk.anyscale_client.models import (
+    CreateProductionJob, ClusterComputeConfig, ComputeNodeType,
+    CreateProductionService, CreateProductionJobConfig
+)
+from anyscale import AnyscaleSDK
+import logging
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-storage_path = "storage.db"
+storage_path = "storage"  # db automatically appended
 
 def submit_anyscale_job(files, file_directory, job_name):
     import yaml
-    from anyscale.sdk.anyscale_client.models import CreateProductionJob, ClusterComputeConfig, ComputeNodeType
-    from anyscale import AnyscaleSDK
 
     sdk = AnyscaleSDK()
     runtime_env = {
@@ -58,6 +64,29 @@ def submit_anyscale_job(files, file_directory, job_name):
     ))
     return job
 
+def submit_service(model_id, local=False):
+    from types import SimpleNamespace
+    if local == True:
+        import subprocess
+        subprocess.run(["python", "service/serve_model.py", "--test"])
+        result = SimpleNamespace()
+        result.url = "http://localhost:8001"
+    else:
+        with open("service/service.yaml", "r") as f:
+            import yaml
+            sdk = AnyscaleSDK()
+            response = sdk.apply_service(
+                create_production_service=CreateProductionService(
+                    name=f"stable-diffusion-{model_id}",
+                    description="Stable diffusion service",
+                    # project_id can be found in the URL
+                    project_id='prj_j2bynt35acxvgtg6riahpzqk',
+                    healthcheck_url="/healthcheck",
+                    config=yaml.safe_load(f),
+                )
+            )
+            result = response.result
+    return result
 
 @app.get("/")
 async def root():
@@ -66,7 +95,8 @@ async def root():
 @app.post("/deploy/{model_id}")
 async def deploy(model_id: str):
     # TODO: deploy model to Anyscale
-    result = submit_service(model_id)
+    local = model_id == "TEST"
+    result = submit_service(model_id, local=local)
     with dbm.open(storage_path, "c") as db:
         db[model_id] = str(result.url)
     return {
@@ -82,14 +112,19 @@ async def deploy(model_id: str):
     response_class=Response,
 )
 async def query_model(model_id: str, prompt: str):
-    model_url = "http://localhost:8001"
-    # with dbm.open(storage_path, "c") as db:
-    #     model_url = db[model_id]
+    with dbm.open(storage_path, "c") as db:
+        if model_id not in db:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Model with ID {model_id} not found"
+            )
+        model_url = db[model_id]
     import requests
     import urllib
     encoded_prompt = urllib.parse.urlencode({
         "prompt": prompt,
         "image_size": 512})
+    logger.info(f"Got {model_url} for {model_id}"})
     response = requests.get(
         f"{model_url}/imagine?{encoded_prompt}")
 
