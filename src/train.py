@@ -136,29 +136,6 @@ noise_scheduler = DDPMScheduler.from_pretrained(
 
 # Data
 
-# This method is No longer used.
-def get_default_dataset():
-    dataset_name = "lambdalabs/pokemon-blip-captions"
-    dataset = load_dataset(
-        dataset_name, #args.dataset_name,
-        None, #args.dataset_config_name,
-        cache_dir=None, #args.cache_dir,
-    )
-    dataset_name_mapping = {
-        "lambdalabs/pokemon-blip-captions": ("image", "text"),
-    }
-
-    # Preprocessing the datasets.
-    # We need to tokenize inputs and targets.
-    column_names = dataset["train"].column_names
-
-    # 6. Get the column names for input/target.
-    # THIS SECTION NEEDS CUSTOMIZATION DEPENDING ON THE DATASET
-    dataset_columns = dataset_name_mapping.get(dataset_name, None)
-    assert image_column in column_names
-    assert caption_column in column_names
-    return dataset
-
 def create_dataset_from_folder(folder: str):
     from datasets import load_dataset, Image, Dataset, Value, DatasetDict
     import json
