@@ -78,7 +78,7 @@ def submit_service(model_id, local=False):
         response = sdk.apply_service(
             create_production_service=CreateProductionService(
                 name=f"stable-diffusion-{model_id}",
-                description="Stable diffusion service",
+                description="Stable diffusion services",
                 # project_id can be found in the URL
                 # https://console.anyscale-staging.com/o/anyscale-internal/projects/prj_j2bynt35acxvgtg6riahpzqk
                 project_id='prj_j2bynt35acxvgtg6riahpzqk',
