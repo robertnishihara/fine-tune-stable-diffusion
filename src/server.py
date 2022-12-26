@@ -45,7 +45,7 @@ def submit_anyscale_job(files, file_directory, job_name):
         # 'runtime_env': {
         #     'working_dir': 's3://my_bucket/my_job_files.zip'
         # },
-        f'entrypoint': 'python train.py',
+        'entrypoint': f'python train.py --image-dir {file_directory}',
         'max_retries': 3
         }
 
@@ -92,17 +92,26 @@ async def query_model(model_id: str, query: str):
 
 # https://fastapi.tiangolo.com/tutorial/request-files/#multiple-file-uploads
 @app.post("/train")
-async def create_upload_files(files: list[UploadFile], job_name: str = None):
+async def create_upload_files(
+        files: list[UploadFile], captions: list[str],
+        job_name: str = None):
     # write files to temporary directory on local disk
     import os
     import tempfile
 
+    captions = [caption.strip() for caption in captions]
+    captions_json = {}
     # create temporary directory
     with tempfile.TemporaryDirectory() as temp_dir:
         # write files to temporary directory
         for file in files:
             with open(os.path.join(temp_dir, file.filename), "wb") as buffer:
                 buffer.write(file.file.read())
+            captions_json[file.filename] = captions.pop(0)
+
+        with open(os.path.join(temp_dir, "captions.json"), "w") as buffer:
+            import json
+            json.dump(captions_json, buffer)
 
         anyscale_job = submit_anyscale_job(files, temp_dir, job_name)
         return {
