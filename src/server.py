@@ -24,7 +24,6 @@ def submit_anyscale_job(files, file_directory, job_name):
     runtime_env = {
         "working_dir": file_directory,
         "upload_path": "s3://anyscale-temp/diffusion-demo/"}
-
     job_config = {
         # IDs can be found on Anyscale Console under Configurations.
         # The IDs below are examples and should be replaced with your own IDs.
@@ -82,12 +81,22 @@ async def deploy(model_id: str):
     responses={200: {"content": {"image/png": {}}}},
     response_class=Response,
 )
-async def query_model(model_id: str, query: str):
-    with dbm.open(storage_path, "c") as db:
-        model_url = db[model_id]
+async def query_model(model_id: str, prompt: str):
+    model_url = "http://localhost:8001"
+    # with dbm.open(storage_path, "c") as db:
+    #     model_url = db[model_id]
     import requests
-    response = requests.get(f"{model_url}/imagine/{query}")
-    return Response(content=file_stream.getvalue(), media_type="image/png")
+    import urllib
+    encoded_prompt = urllib.parse.urlencode({
+        "prompt": prompt,
+        "image_size": 512})
+    response = requests.get(
+        f"{model_url}/imagine?{encoded_prompt}")
+
+    return Response(
+        content=response.content,
+        media_type="image/png",
+        status_code=response.status_code)
 
 
 # https://fastapi.tiangolo.com/tutorial/request-files/#multiple-file-uploads

@@ -1,5 +1,14 @@
 # fine-tune-stable-diffusion
 
+Overall application architecture:
+ - `train.py` - trains a model on a cluster
+ - `load_checkpoint.py` - loads a checkpoint
+ - `server.py` - runs a server that coordinates the serving and training
+ - `serve_model.py` - creates a ray serve deployment using the checkpoint
+
+ TODOs:
+  - [ ] Make sure the model is actually being trained
+  - [ ] Make sure the model is served correctly
 
 To run `train.py`
 - Use this cluster environment https://console.anyscale-staging.com/o/anyscale-internal/configurations/app-config-details/bld_hu28yb4llwb66fxh3cd9dzh9ty

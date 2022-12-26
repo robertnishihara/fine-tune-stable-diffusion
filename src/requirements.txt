@@ -3,3 +3,7 @@ uvicorn
 python-multipart  # for images
 anyscale
 pyyaml
+'ray[serve]'
+torch
+diffusers
+pillow

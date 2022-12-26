@@ -5,8 +5,6 @@ from io import BytesIO
 from ray import serve
 from fastapi import FastAPI
 from fastapi.responses import Response
-import torch
-from diffusers import EulerDiscreteScheduler, StableDiffusionPipeline
 
 app = FastAPI()
 
@@ -37,6 +35,8 @@ class APIIngress:
 )
 class StableDiffusionV2:
     def __init__(self):
+        import torch
+        from diffusers import EulerDiscreteScheduler, StableDiffusionPipeline
         model_id = "stabilityai/stable-diffusion-2"
 
         scheduler = EulerDiscreteScheduler.from_pretrained(
@@ -75,5 +75,8 @@ args = parser.parse_args()
 
 if args.test:
     entrypoint = APIIngress.bind(SimpleDiffusion.bind())
+    serve.run(entrypoint, port=8001)
+    import time
+    time.sleep(100000)
 else:
     entrypoint = APIIngress.bind(StableDiffusionV2.bind())
