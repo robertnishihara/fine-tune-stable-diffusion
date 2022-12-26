@@ -33,8 +33,8 @@ center_crop = True
 random_flip = True
 gradient_accumulation_steps = 1
 mixed_precision = None
-report_to = "tensorboard"
-train_batch_size = 16
+report_to = None #"tensorboard"
+train_batch_size = 1 #16
 num_train_epochs = 2
 lr_scheduler = "constant"
 lr_warmup_steps = 500
@@ -149,7 +149,7 @@ def preprocess_train(examples):
 accelerator = Accelerator(
     gradient_accumulation_steps=gradient_accumulation_steps,
     mixed_precision=mixed_precision,
-    log_with=report_to,
+    # log_with=report_to,
     logging_dir=logging_dir,
 )
 
@@ -298,7 +298,8 @@ for epoch in range(first_epoch, num_train_epochs):
                 ema_unet.step(unet.parameters())
             progress_bar.update(1)
             global_step += 1
-            accelerator.log({"train_loss": train_loss}, step=global_step)
+            # accelerator.log({"train_loss": train_loss}, step=global_step)
+            print("train_loss", train_loss)
             train_loss = 0.0
 
             # TODO: CHECKPOINTING HERE
