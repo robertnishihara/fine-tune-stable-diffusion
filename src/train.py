@@ -396,32 +396,3 @@ if accelerator.is_main_process:
     #     repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)
 
 #accelerator.end_training()
-
-
-
-"""
-pipeline = StableDiffusionPipeline.from_pretrained(
-    model_id, #args.pretrained_model_name_or_path,
-    text_encoder=text_encoder,
-    vae=vae,
-    unet=unet,
-    revision=None, #args.revision,
-)
-pipeline.save_pretrained(output_dir)
-"""
-
-
-
-
-
-
-
-"""
-scheduler = EulerDiscreteScheduler.from_pretrained(
-    model_id, subfolder="scheduler"
-)
-self.pipe = StableDiffusionPipeline.from_pretrained(
-    model_id, scheduler=scheduler, revision="fp16", torch_dtype=torch.float16
-)
-self.pipe = self.pipe.to("cuda")
-"""
