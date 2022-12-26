@@ -18,6 +18,10 @@ Example directory:
 See test_photos/ for an example.
 """
 
+# Initializing Ray just to get the stdout.
+import ray
+ray.init()
+
 import math
 import os
 import random
@@ -80,7 +84,6 @@ def get_images_in_folder(folder: str) -> Iterable[Path]:
 def get_image_dir(args):
     if not args.image_dir:
         print("Image dir not specified, using default")
-        import os
         parent_path = os.path.dirname( # repo_base/
             os.path.dirname(os.path.realpath(__file__))) # src/
 

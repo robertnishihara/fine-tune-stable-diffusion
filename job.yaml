@@ -1,4 +1,4 @@
-entrypoint: python src/train.py
+entrypoint: python src/train.py --image-dir /home/ray/default/test_photos
 compute_config:
   cloud_id: cld_401TPoxgB8MM6A0NNQauOV  # anyscale_default_cloud
   region: us-west-2
