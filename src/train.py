@@ -48,6 +48,11 @@ output_dir = "sd-model-finetuned"
 logging_dir = os.path.join(output_dir, "logs")
 model_id = "stabilityai/stable-diffusion-2"
 
+import os
+parent_path = os.path.dirname( # repo_base/
+    os.path.dirname(os.path.realpath(__file__))) # src/
+
+folder = os.path.expanduser(os.path.join(parent_path, "test_photos"))
 
 tokenizer = CLIPTokenizer.from_pretrained(
     model_id, #args.pretrained_model_name_or_path,
@@ -91,25 +96,51 @@ noise_scheduler = DDPMScheduler.from_pretrained(
 
 
 # Data
-dataset_name = "lambdalabs/pokemon-blip-captions"
-dataset = load_dataset(
-    dataset_name, #args.dataset_name,
-    None, #args.dataset_config_name,
-    cache_dir=None, #args.cache_dir,
-)
-dataset_name_mapping = {
-    "lambdalabs/pokemon-blip-captions": ("image", "text"),
-}
 
-# Preprocessing the datasets.
-# We need to tokenize inputs and targets.
-column_names = dataset["train"].column_names
+def get_default_dataset():
+    dataset_name = "lambdalabs/pokemon-blip-captions"
+    dataset = load_dataset(
+        dataset_name, #args.dataset_name,
+        None, #args.dataset_config_name,
+        cache_dir=None, #args.cache_dir,
+    )
+    dataset_name_mapping = {
+        "lambdalabs/pokemon-blip-captions": ("image", "text"),
+    }
 
-# 6. Get the column names for input/target.
-# THIS SECTION NEEDS CUSTOMIZATION DEPENDING ON THE DATASET
-dataset_columns = dataset_name_mapping.get(dataset_name, None)
-assert image_column in column_names
-assert caption_column in column_names
+    # Preprocessing the datasets.
+    # We need to tokenize inputs and targets.
+    column_names = dataset["train"].column_names
+
+    # 6. Get the column names for input/target.
+    # THIS SECTION NEEDS CUSTOMIZATION DEPENDING ON THE DATASET
+    dataset_columns = dataset_name_mapping.get(dataset_name, None)
+    assert image_column in column_names
+    assert caption_column in column_names
+    return dataset
+
+
+def get_images_in_folder(folder: str) -> Iterable[Path]:
+    return list(Path(folder).glob("*.png"))
+
+def create_dataset_from_folder(folder: str):
+    from datasets import load_dataset, Image, Dataset, Value, DatasetDict
+    import json
+    images = get_images_in_folder(folder)
+    data_dict = {"image": [image_path.as_posix() for image_path in images]}
+    with open(os.path.join(folder, "captions.json"), "r") as f:
+        text_captions = json.load(f)
+    image_order = [image_path.stem for image_path in images]
+    data_dict["text"] = [text_captions[image_name] for image_name in image_order]
+    print(data_dict)
+    dataset = Dataset.from_dict(data_dict)
+    dataset = dataset.cast_column("image", Image())
+    dataset = dataset.cast_column("text", Value("string"))
+    dataset = DatasetDict({"train": dataset})
+    return dataset
+
+dataset = create_dataset_from_folder(folder)
+# dataset = get_default_dataset()
 
 # Preprocessing the datasets.
 # We need to tokenize input captions and transform the images.
@@ -171,7 +202,6 @@ def collate_fn(examples):
 train_dataloader = torch.utils.data.DataLoader(
     train_dataset, shuffle=True, collate_fn=collate_fn, batch_size=train_batch_size
 )
-
 
 overrode_max_train_steps = False
 num_update_steps_per_epoch = math.ceil(len(train_dataloader) / gradient_accumulation_steps)
