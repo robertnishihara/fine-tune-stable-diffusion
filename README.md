@@ -8,7 +8,15 @@ Overall application architecture:
 
  TODOs:
   - [ ] Make sure the model is actually being trained
-  - [ ] Make sure the model is served correctly
+  - [ ] Make sure I can query the model properly
+    - [x] Querying a fake model locally and rendering the right output
+    - [ ] Querying a fake model remotely and rendering the right output
+    - [ ] Querying a real model remotely and rendering the right output
+    - [ ] Querying any model remotely and rendering the right output
+  - [ ] Deploying models
+    - [ ]
+
+
 
 To run `train.py`
 - Use this cluster environment https://console.anyscale-staging.com/o/anyscale-internal/configurations/app-config-details/bld_hu28yb4llwb66fxh3cd9dzh9ty
