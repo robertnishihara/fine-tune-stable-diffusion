@@ -41,6 +41,7 @@ lr_warmup_steps = 500
 use_ema = False  # To use this, must copy EMAModel class from https://github.com/huggingface/diffusers/blob/main/examples/text_to_image/train_text_to_image.py#L266
 resume_from_checkpoint = False
 max_grad_norm = 1.0
+max_train_steps = 5
 
 logger = get_logger(__name__)
 
@@ -172,11 +173,7 @@ train_dataloader = torch.utils.data.DataLoader(
     train_dataset, shuffle=True, collate_fn=collate_fn, batch_size=train_batch_size
 )
 
-
-overrode_max_train_steps = False
 num_update_steps_per_epoch = math.ceil(len(train_dataloader) / gradient_accumulation_steps)
-max_train_steps = num_train_epochs * num_update_steps_per_epoch
-overrode_max_train_steps = True
 
 lr_scheduler = get_scheduler(
     lr_scheduler,
@@ -207,8 +204,6 @@ vae.to(accelerator.device, dtype=weight_dtype)
 
 # We need to recalculate our total training steps as the size of the training dataloader may have changed.
 num_update_steps_per_epoch = math.ceil(len(train_dataloader) / gradient_accumulation_steps)
-if overrode_max_train_steps:
-    max_train_steps = num_train_epochs * num_update_steps_per_epoch
 # Afterwards we recalculate our number of training epochs
 num_train_epochs = math.ceil(max_train_steps / num_update_steps_per_epoch)
 
@@ -302,7 +297,6 @@ for epoch in range(first_epoch, num_train_epochs):
             print("train_loss", train_loss)
             train_loss = 0.0
 
-            # TODO: CHECKPOINTING HERE
             # if global_step % args.checkpointing_steps == 0:
             #     if accelerator.is_main_process:
             #         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
@@ -315,6 +309,34 @@ for epoch in range(first_epoch, num_train_epochs):
         if global_step >= max_train_steps:
             break
 
+
+"""
+if accelerator.is_main_process:
+    save_path = os.path.join(output_dir, f"checkpoint-final")
+    accelerator.save_state(save_path)
+    logger.info(f"Saved state to {save_path}")
+"""
+
+# Create the pipeline using the trained modules and save it.
+accelerator.wait_for_everyone()
+if accelerator.is_main_process:
+    unet = accelerator.unwrap_model(unet)
+    # if args.use_ema:
+    #     ema_unet.copy_to(unet.parameters())
+
+    pipeline = StableDiffusionPipeline.from_pretrained(
+        model_id, #args.pretrained_model_name_or_path,
+        text_encoder=text_encoder,
+        vae=vae,
+        unet=unet,
+        revision=None, #args.revision,
+    )
+    pipeline.save_pretrained(output_dir)
+
+    # if args.push_to_hub:
+    #     repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)
+
+accelerator.end_training()
 
 
 
