@@ -69,6 +69,7 @@ def submit_service(model_id, local=False):
     from types import SimpleNamespace
     if local == True:
         import subprocess
+        # This is probably all broken rn
         subprocess.run(["python", "service/serve_model.py", "--test"])
         result = SimpleNamespace()
         result.url = "http://localhost:8001"

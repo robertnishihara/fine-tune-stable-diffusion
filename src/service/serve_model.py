@@ -5,8 +5,10 @@ from io import BytesIO
 from ray import serve
 from fastapi import FastAPI
 from fastapi.responses import Response
-
+import logging
 app = FastAPI()
+
+logger = logging.getLogger(__name__)
 
 @serve.deployment(num_replicas=1, route_prefix="/")
 @serve.ingress(app)
@@ -61,7 +63,7 @@ class SimpleDiffusion:
         import requests
         from PIL import Image
         from io import BytesIO
-
+        logger.info(f"Generating image for {prompt}")
         response = requests.get("https://picsum.photos/200")
         image = Image.open(BytesIO(response.content))
         return image
