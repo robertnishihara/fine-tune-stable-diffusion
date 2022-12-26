@@ -48,11 +48,49 @@ output_dir = "sd-model-finetuned"
 logging_dir = os.path.join(output_dir, "logs")
 model_id = "stabilityai/stable-diffusion-2"
 
-import os
-parent_path = os.path.dirname( # repo_base/
-    os.path.dirname(os.path.realpath(__file__))) # src/
+import argparse
 
-folder = os.path.expanduser(os.path.join(parent_path, "test_photos"))
+parser = argparse.ArgumentParser()
+# Directory for images
+parser.add_argument("--image-dir", type=str)
+args = parser.parse_args()
+
+def get_images_in_folder(folder: str) -> Iterable[Path]:
+    return list(Path(folder).glob("*.png"))
+
+def get_image_dir(args):
+    if not args.image_dir:
+        print("Image dir not specified, using default")
+        import os
+        parent_path = os.path.dirname( # repo_base/
+            os.path.dirname(os.path.realpath(__file__))) # src/
+
+        image_dir = os.path.expanduser(os.path.join(parent_path, "test_photos"))
+    elif not os.path.exists(args.image_dir):
+        raise ValueError(f"Image directory {args.image_dir} does not exist")
+    else:
+        image_dir = args.image_dir
+    return image_dir
+
+
+def validate_image_dir(image_dir: str):
+    # Validate that captions are available
+    if not os.path.exists(os.path.join(image_dir, "captions.json")):
+        raise ValueError(f"Captions not found in {image_dir}")
+
+    # Validate that captions match image names
+    import json
+    with open(os.path.join(image_dir, "captions.json")) as f:
+        captions = json.load(f)
+        images = get_images_in_folder(image_dir)
+        for image in images:
+            if image.stem not in captions:
+                raise ValueError(f"Image {image.stem} does not have a caption.")
+
+
+image_dir = get_image_dir(args)
+validate_image_dir(image_dir)
+
 
 tokenizer = CLIPTokenizer.from_pretrained(
     model_id, #args.pretrained_model_name_or_path,
@@ -97,6 +135,7 @@ noise_scheduler = DDPMScheduler.from_pretrained(
 
 # Data
 
+# This method is No longer used.
 def get_default_dataset():
     dataset_name = "lambdalabs/pokemon-blip-captions"
     dataset = load_dataset(
@@ -119,10 +158,6 @@ def get_default_dataset():
     assert caption_column in column_names
     return dataset
 
-
-def get_images_in_folder(folder: str) -> Iterable[Path]:
-    return list(Path(folder).glob("*.png"))
-
 def create_dataset_from_folder(folder: str):
     from datasets import load_dataset, Image, Dataset, Value, DatasetDict
     import json
@@ -132,15 +167,13 @@ def create_dataset_from_folder(folder: str):
         text_captions = json.load(f)
     image_order = [image_path.stem for image_path in images]
     data_dict["text"] = [text_captions[image_name] for image_name in image_order]
-    print(data_dict)
     dataset = Dataset.from_dict(data_dict)
     dataset = dataset.cast_column("image", Image())
     dataset = dataset.cast_column("text", Value("string"))
     dataset = DatasetDict({"train": dataset})
     return dataset
 
-dataset = create_dataset_from_folder(folder)
-# dataset = get_default_dataset()
+dataset = create_dataset_from_folder(image_dir)
 
 # Preprocessing the datasets.
 # We need to tokenize input captions and transform the images.
