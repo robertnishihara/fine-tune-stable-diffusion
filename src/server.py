@@ -80,10 +80,13 @@ def submit_service(model_id, local=False):
                 name=f"stable-diffusion-{model_id}",
                 description="Stable diffusion service",
                 # project_id can be found in the URL
+                # https://console.anyscale-staging.com/o/anyscale-internal/projects/prj_j2bynt35acxvgtg6riahpzqk
                 project_id='prj_j2bynt35acxvgtg6riahpzqk',
                 healthcheck_url="/healthcheck",
                 config=dict(
+                    # https://console.anyscale-staging.com/o/anyscale-internal/configurations/cluster-computes/cpt_v1hkxu5rd61ql5nd268fen83t7
                     compute_config_id="cpt_v1hkxu5rd61ql5nd268fen83t7",
+                    # https://console.anyscale-staging.com/o/anyscale-internal/configurations/app-config-details/bld_hu28yb4llwb66fxh3cd9dzh9ty
                     build_id="bld_hu28yb4llwb66fxh3cd9dzh9ty",
                     runtime_env=dict(
                         working_dir="https://github.com/robertnishihara/fine-tune-stable-diffusion/archive/refs/heads/main.zip"
@@ -108,12 +111,18 @@ async def deploy(model_id: str):
     result = submit_service(model_id, local=local)
     with dbm.open(storage_path, "c") as db:
         db[model_id] = str(result.url)
+        db["{model_id}_token"] = get_service_token(result.id)
     return {
         "message": "Deployed model successfully!",
         "model_id": model_id,
         "model_url": result.url
     }
 
+def get_service_token(service_id):
+    from anyscale import AnyscaleSDK
+    sdk = AnyscaleSDK()
+    service = sdk.get_service(service_id).result
+    return service.token
 
 @app.get(
     "/query",
@@ -127,15 +136,18 @@ async def query_model(model_id: str, prompt: str):
                 status_code=404,
                 detail=f"Model with ID {model_id} not found"
             )
-        model_url = db[model_id]
+        model_url = db[model_id].decode() # to str
+        service_token = db[f"{model_id}_token"].decode() # to str
     import requests
     import urllib
+
     encoded_prompt = urllib.parse.urlencode({
         "prompt": prompt,
         "image_size": 512})
     logger.info(f"Got {model_url} for {model_id}")
     response = requests.get(
-        f"{model_url}/imagine?{encoded_prompt}")
+        f"{model_url}/imagine?{encoded_prompt}",
+        headers={"Authorization": f"Bearer {service_token}"})
 
     return Response(
         content=response.content,
