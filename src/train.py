@@ -1,3 +1,5 @@
+# Copied from https://github.com/huggingface/diffusers/blob/main/examples/text_to_image/train_text_to_image.py
+
 import math
 import os
 import random
