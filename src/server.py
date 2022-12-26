@@ -111,7 +111,9 @@ async def deploy(model_id: str):
     result = submit_service(model_id, local=local)
     with dbm.open(storage_path, "c") as db:
         db[model_id] = str(result.url)
-        db["{model_id}_token"] = get_service_token(result.id)
+        db[f"{model_id}_token"] = get_service_token(result.id)
+        print("URL: ", result.url)
+        print("Token: ", get_service_token(result.id))
     return {
         "message": "Deployed model successfully!",
         "model_id": model_id,
@@ -148,7 +150,6 @@ async def query_model(model_id: str, prompt: str):
     response = requests.get(
         f"{model_url}/imagine?{encoded_prompt}",
         headers={"Authorization": f"Bearer {service_token}"})
-
     return Response(
         content=response.content,
         media_type="image/png",

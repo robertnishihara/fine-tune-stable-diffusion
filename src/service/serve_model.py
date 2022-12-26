@@ -69,8 +69,5 @@ class SimpleDiffusion:
 print("FORCING TEST MODE")
 if True:
     entrypoint = APIIngress.bind(SimpleDiffusion.bind())
-    serve.run(entrypoint, port=8001)
-    import time
-    time.sleep(100000)
 else:
     entrypoint = APIIngress.bind(StableDiffusionV2.bind())
