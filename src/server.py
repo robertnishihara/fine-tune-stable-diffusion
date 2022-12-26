@@ -5,11 +5,13 @@ How to run:
 
 How to test:
 """
-
-
+# dumb basic storage
+import dbm
 from fastapi import FastAPI, File, UploadFile
 
 app = FastAPI()
+
+storage_path = "storage.db"
 
 def submit_anyscale_job(files, file_directory, job_name):
     import yaml
@@ -20,6 +22,7 @@ def submit_anyscale_job(files, file_directory, job_name):
     runtime_env = {
         "working_dir": file_directory,
         "upload_path": "s3://anyscale-temp/diffusion-demo/"}
+
     job_config = {
         # IDs can be found on Anyscale Console under Configurations.
         # The IDs below are examples and should be replaced with your own IDs.
@@ -58,6 +61,32 @@ def submit_anyscale_job(files, file_directory, job_name):
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
+
+@app.post("/deploy/{model_id}")
+async def deploy(model_id: str):
+    # TODO: deploy model to Anyscale
+    result = submit_service(model_id)
+    with dbm.open(storage_path, "c") as db:
+        db[model_id] = str(result.url)
+    return {
+        "message": "Deployed model successfully!",
+        "model_id": model_id,
+        "model_url": result.url
+    }
+
+
+@app.get(
+    "/query",
+    responses={200: {"content": {"image/png": {}}}},
+    response_class=Response,
+)
+async def query_model(model_id: str, query: str):
+    with dbm.open(storage_path, "c") as db:
+        model_url = db[model_id]
+    import requests
+    response = requests.get(f"{model_url}/imagine/{query}")
+    return Response(content=file_stream.getvalue(), media_type="image/png")
+
 
 # https://fastapi.tiangolo.com/tutorial/request-files/#multiple-file-uploads
 @app.post("/train")
