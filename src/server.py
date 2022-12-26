@@ -8,6 +8,8 @@ How to test:
 # dumb basic storage
 import dbm
 from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import Response
+
 
 app = FastAPI()
 

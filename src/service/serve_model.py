@@ -54,6 +54,25 @@ class StableDiffusionV2:
 
         return image
 
+@serve.deployment
+class SimpleDiffusion:
+    def generate(self, prompt: str, img_size: int = 512):
+        # get a random image from the internet
+        import requests
+        from PIL import Image
+        from io import BytesIO
 
+        response = requests.get("https://picsum.photos/200")
+        image = Image.open(BytesIO(response.content))
+        return image
+
+import argparse
+
+parser = argparse.ArgumentParser()
+# Toggle between test run and production run
+parser.add_argument("--test", action="store_true")
+args = parser.parse_args()
+
+if args.test:
 
 entrypoint = APIIngress.bind(StableDiffusionV2.bind())
