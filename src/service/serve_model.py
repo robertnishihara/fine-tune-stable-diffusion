@@ -66,15 +66,8 @@ class SimpleDiffusion:
         image = Image.open(BytesIO(response.content))
         return image
 
-import argparse
-
-parser = argparse.ArgumentParser()
-# Toggle between test run and production run
-parser.add_argument("--test", action="store_true")
-args = parser.parse_args()
-
 print("FORCING TEST MODE")
-if args.test or True:
+if True:
     entrypoint = APIIngress.bind(SimpleDiffusion.bind())
     serve.run(entrypoint, port=8001)
     import time

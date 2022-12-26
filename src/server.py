@@ -86,10 +86,9 @@ def submit_service(model_id, local=False):
                     compute_config_id="cpt_v1hkxu5rd61ql5nd268fen83t7",
                     build_id="bld_hu28yb4llwb66fxh3cd9dzh9ty",
                     runtime_env=dict(
-                        working_dir=current_dir,
-                        upload_path="s3://anyscale-public-demo/diffusion-demo/runtime_envs",
+                        working_dir="https://github.com/robertnishihara/fine-tune-stable-diffusion/archive/refs/heads/main.zip"
                     ),
-                    entrypoint="cd service && serve run --non-blocking serve_model:entrypoint",
+                    entrypoint="cd src/service && serve run --non-blocking serve_model:entrypoint",
                     access="public"
                 )
             )
