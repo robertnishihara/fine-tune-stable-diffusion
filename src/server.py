@@ -5,6 +5,7 @@ How to run:
 
 How to test:
 """
+import os
 # dumb basic storage
 import dbm
 from fastapi import FastAPI, UploadFile, HTTPException
@@ -75,6 +76,7 @@ def submit_service(model_id, local=False):
         with open("service/service.yaml", "r") as f:
             import yaml
             sdk = AnyscaleSDK()
+            current_dir = os.path.dirname(os.path.abspath(__file__))
             response = sdk.apply_service(
                 create_production_service=CreateProductionService(
                     name=f"stable-diffusion-{model_id}",
@@ -82,7 +84,16 @@ def submit_service(model_id, local=False):
                     # project_id can be found in the URL
                     project_id='prj_j2bynt35acxvgtg6riahpzqk',
                     healthcheck_url="/healthcheck",
-                    config=yaml.safe_load(f),
+                    config=dict(
+                        compute_config_id="cpt_v1hkxu5rd61ql5nd268fen83t7",
+                        build_id="bld_hu28yb4llwb66fxh3cd9dzh9ty",
+                        runtime_env=dict(
+                            working_dir=current_dir,
+                            upload_path="s3://anyscale-temp/diffusion-demo/runtime_envs/",
+                        ),
+                        entrypoint="cd service && serve run --non-blocking server_model:entrypoint",
+                        access="public"
+                    )
                 )
             )
             result = response.result
@@ -124,7 +135,7 @@ async def query_model(model_id: str, prompt: str):
     encoded_prompt = urllib.parse.urlencode({
         "prompt": prompt,
         "image_size": 512})
-    logger.info(f"Got {model_url} for {model_id}"})
+    logger.info(f"Got {model_url} for {model_id}")
     response = requests.get(
         f"{model_url}/imagine?{encoded_prompt}")
 
