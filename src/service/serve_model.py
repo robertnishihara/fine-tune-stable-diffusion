@@ -75,4 +75,5 @@ args = parser.parse_args()
 
 if args.test:
     entrypoint = APIIngress.bind(SimpleDiffusion.bind())
-entrypoint = APIIngress.bind(StableDiffusionV2.bind())
+else:
+    entrypoint = APIIngress.bind(StableDiffusionV2.bind())

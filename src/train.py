@@ -1,4 +1,22 @@
 # Copied from https://github.com/huggingface/diffusers/blob/main/examples/text_to_image/train_text_to_image.py
+"""Training file.
+
+How to use:
+
+    python train.py --image-dir /path/to/images
+
+Image directory must contain images and captions in json format.
+
+Example directory:
+
+    /path/to/images
+        1.png
+        2.png
+        3.png
+        captions.json
+
+See test_photos/ for an example.
+"""
 
 import math
 import os
@@ -85,8 +103,8 @@ def validate_image_dir(image_dir: str):
         captions = json.load(f)
         images = get_images_in_folder(image_dir)
         for image in images:
-            if image.stem not in captions:
-                raise ValueError(f"Image {image.stem} does not have a caption.")
+            if image.name not in captions:
+                raise ValueError(f"Image {image.name} does not have a caption.")
 
 
 image_dir = get_image_dir(args)
@@ -143,7 +161,7 @@ def create_dataset_from_folder(folder: str):
     data_dict = {"image": [image_path.as_posix() for image_path in images]}
     with open(os.path.join(folder, "captions.json"), "r") as f:
         text_captions = json.load(f)
-    image_order = [image_path.stem for image_path in images]
+    image_order = [image_path.name for image_path in images]
     data_dict["text"] = [text_captions[image_name] for image_name in image_order]
     dataset = Dataset.from_dict(data_dict)
     dataset = dataset.cast_column("image", Image())
