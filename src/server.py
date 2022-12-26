@@ -82,7 +82,7 @@ def submit_service(model_id, local=False):
                 # project_id can be found in the URL
                 # https://console.anyscale-staging.com/o/anyscale-internal/projects/prj_j2bynt35acxvgtg6riahpzqk
                 project_id='prj_j2bynt35acxvgtg6riahpzqk',
-                healthcheck_url="/healthcheck",
+                healthcheck_url="/-/healthz",
                 config=dict(
                     # https://console.anyscale-staging.com/o/anyscale-internal/configurations/cluster-computes/cpt_v1hkxu5rd61ql5nd268fen83t7
                     compute_config_id="cpt_v1hkxu5rd61ql5nd268fen83t7",
