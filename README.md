@@ -11,4 +11,6 @@ You can then load the checkpoint and run inference with `python load_checkpoint.
 
 
 ### Notes
-- Stored a checkpoint file with `aws s3 cp src/checkpoint.tar.gz s3://anyscale-temp/diffusion-demo/`, will need to fetch it and untar it and then you should ideally be able to load it with `load_checkpoint.py` pointed to the appropriate location.
+- Stored a checkpoint file with `aws s3 cp src/checkpoint.tar.gz s3://anyscale-temp/diffusion-demo/`, will need to fetch it and untar it and then you should ideally be able to load it with `load_checkpoint.py` pointed to the appropriate location. E.g.,
+    - `aws s3 cp s3://anyscale-temp/diffusion-demo/checkpoint-demo.tar.gz .`
+    - `tar xvf checkpoint-demo.tar.gz`
