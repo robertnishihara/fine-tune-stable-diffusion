@@ -1,5 +1,5 @@
 import dbm
-
+from fastapi import HTTPException
 storage_path = "storage"  # db automatically appended
 
 
