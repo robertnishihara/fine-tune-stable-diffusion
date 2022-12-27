@@ -102,7 +102,6 @@ def submit_service(model_id, model_path, local=False):
         assert s3_exists(model_path), f"{model_path} does not exist on s3."
         sdk = AnyscaleSDK()
         # current_dir = os.path.dirname(os.path.abspath(__file__))
-        service_runtime_env = {"working_dir": ".", "env_vars": {"MODEL_PATH": model_path}}
         response = sdk.apply_service(
             create_production_service=CreateProductionService(
                 name=f"stable-diffusion-{model_id}",
@@ -119,7 +118,8 @@ def submit_service(model_id, model_path, local=False):
                     runtime_env=dict(
                         working_dir="https://github.com/robertnishihara/fine-tune-stable-diffusion/archive/refs/heads/main.zip",
                         env_vars=dict(
-                            RANDOM=str(uuid.uuid4())
+                            RANDOM=str(uuid.uuid4()),
+                            MODEL_PATH=model_path
                         )
                     ),
                     entrypoint=f"serve run --non-blocking src.service.serve_model:entrypoint",
