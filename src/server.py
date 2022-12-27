@@ -5,10 +5,12 @@ How to run:
 
 How to test:
 """
+from typing import Optional
 import os
 # dumb basic storage
 import dbm
 from fastapi import FastAPI, UploadFile, HTTPException
+from pydantic import Field
 from fastapi.responses import Response
 
 from anyscale.sdk.anyscale_client.models import (
@@ -23,6 +25,27 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 storage_path = "storage"  # db automatically appended
+
+
+def s3_exists(s3filepath):
+    import boto3
+    import botocore
+
+    s3 = boto3.resource('s3')
+    s3filepath = s3filepath[5:] # remove s3://
+
+    bucket_name, key = s3filepath.split('/', 1)
+
+    try:
+        s3.Object(bucket_name, key).load()
+    except botocore.exceptions.ClientError as e:
+        if e.response['Error']['Code'] == "404":
+            return False
+        else:
+            # Something else has gone wrong.
+            raise
+    return True
+
 
 def submit_anyscale_job(files, file_directory, job_name):
     import yaml
@@ -65,15 +88,17 @@ def submit_anyscale_job(files, file_directory, job_name):
     ))
     return job
 
-def submit_service(model_id, local=False):
+def submit_service(model_id, model_path, local=False):
     from types import SimpleNamespace
-    if local == True:
+    if local:
         import subprocess
         # This is probably all broken rn
         subprocess.run(["python", "service/serve_model.py", "--test"])
         result = SimpleNamespace()
         result.url = "http://localhost:8001"
     else:
+        assert s3_exists(model_path), f"{model_path} does not exist on s3."
+
         sdk = AnyscaleSDK()
         current_dir = os.path.dirname(os.path.abspath(__file__))
         response = sdk.apply_service(
@@ -90,7 +115,10 @@ def submit_service(model_id, local=False):
                     # https://console.anyscale-staging.com/o/anyscale-internal/configurations/app-config-details/bld_hu28yb4llwb66fxh3cd9dzh9ty
                     build_id="bld_hu28yb4llwb66fxh3cd9dzh9ty",
                     runtime_env=dict(
-                        working_dir="https://github.com/robertnishihara/fine-tune-stable-diffusion/archive/refs/heads/main.zip"
+                        working_dir="https://github.com/robertnishihara/fine-tune-stable-diffusion/archive/refs/heads/main.zip",
+                        env_vars=dict(
+                            MODEL_PATH=model_path
+                        )
                     ),
                     entrypoint="cd src/service && serve run --non-blocking serve_model:entrypoint",
                     access="public"
@@ -105,15 +133,26 @@ def submit_service(model_id, local=False):
 async def root():
     return {"message": "Hello World"}
 
+
 @app.post("/deploy/{model_id}")
-async def deploy(model_id: str):
+async def deploy(model_id: str, model_path: Optional[str] = None):
     # TODO: deploy model to Anyscale
     local = model_id == "TEST"
-    result = submit_service(model_id, local=local)
+
+    if model_path is None:
+        with dbm.open(storage_path, "c") as db:
+            model_path = db[f"{model_id}_path"]
+
+    result = submit_service(model_id, model_path, local=local)
     with dbm.open(storage_path, "c") as db:
-        db[model_id] = str(result.url)
+        db[model_id] = "deployed"
+        db[f"{model_id}_url"] = str(result.url)
+        db[f"{model_id}_service_id"] = str(result.id)
+        db[f"{model_id}_service_name"] = str(result.name)
         db[f"{model_id}_token"] = get_service_token(result.id)
         print("URL: ", result.url)
+        print("service_id", service_id)
+        print("service_name", service_name)
         print("Token: ", get_service_token(result.id))
     return {
         "message": "Deployed model successfully!",
@@ -127,27 +166,56 @@ def get_service_token(service_id):
     service = sdk.get_service(service_id).result
     return service.token
 
+def get_service_url(service_id, model_id, cache=True):
+    from anyscale import AnyscaleSDK
+    sdk = AnyscaleSDK()
+    service = sdk.get_service(service_id).result
+    service_url = service.url
+    if service_url is None:
+        raise ValueError("Service URL is None")
+    if cache:
+        with dbm.open(storage_path, "c") as db:
+            db[f"{model_id}_url"] = str(service_url)
+    return service.url
+
 @app.get(
     "/query",
     responses={200: {"content": {"image/png": {}}}},
     response_class=Response,
 )
-async def query_model(model_id: str, prompt: str):
-    with dbm.open(storage_path, "c") as db:
-        if model_id not in db:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Model with ID {model_id} not found"
-            )
-        model_url = db[model_id].decode() # to str
-        service_token = db[f"{model_id}_token"].decode() # to str
+async def query_model(
+        model_id: str,
+        prompt: str,
+        override_model_url: Optional[str] = None,
+        override_token: Optional[str] = None,
+    ):
+    if override_model_url is not None:
+        model_url = override_model_url
+        service_token = override_token
+    else:
+        with dbm.open(storage_path, "c") as db:
+            if model_id not in db:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Model with ID {model_id} not found"
+                )
+            model_url = db[f"{model_id}_url"].decode() # to str
+            service_token = db[f"{model_id}_token"].decode() # to str
+            service_id = db[f"{model_id}_service_id"].decode() # to str
+            print(model_url, type(model_url))
+
+        if not model_url.startswith("http"):
+            logger.info(f"model_url={model_url} for {model_id}, querying for url...")
+            model_url = get_service_url(service_id, model_id, cache=True)
+            logger.info(f"Got {model_url} for {model_id}")
+
     import requests
     import urllib
-
     encoded_prompt = urllib.parse.urlencode({
         "prompt": prompt,
         "image_size": 512})
-    logger.info(f"Got {model_url} for {model_id}")
+    print(f"Got {model_url} for {model_id}")
+    print("Token: ", service_token)
     response = requests.get(
         f"{model_url}/imagine?{encoded_prompt}",
         headers={"Authorization": f"Bearer {service_token}"})
