@@ -24,7 +24,7 @@ from anyscale.sdk.anyscale_client.models import (
 from anyscale import AnyscaleSDK
 import logging
 
-from .db import DBClient
+from db_client import DBClient
 
 app = FastAPI()
 
