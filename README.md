@@ -10,7 +10,7 @@ Overall application architecture:
   - [ ] Make sure the model is actually being trained
   - [ ] Make sure I can query the model properly
     - [x] Querying a fake model locally and rendering the right output
-    - [ ] Querying a fake model remotely and rendering the right output
+    - [x] Querying a fake model remotely and rendering the right output
     - [ ] Querying a real model remotely and rendering the right output
     - [ ] Querying any model remotely and rendering the right output
   - [ ] Deploying models

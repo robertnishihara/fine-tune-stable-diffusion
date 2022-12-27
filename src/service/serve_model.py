@@ -38,21 +38,17 @@ class APIIngress:
 class StableDiffusionV2:
     def __init__(self):
         import torch
-        from diffusers import EulerDiscreteScheduler, StableDiffusionPipeline
-        model_id = "stabilityai/stable-diffusion-2"
-
-        scheduler = EulerDiscreteScheduler.from_pretrained(
-            model_id, subfolder="scheduler"
-        )
+        from diffusers import StableDiffusionPipeline
         self.pipe = StableDiffusionPipeline.from_pretrained(
-            model_id, scheduler=scheduler, revision="fp16", torch_dtype=torch.float16
-        )
-        self.pipe = self.pipe.to("cuda")
+            model_path, torch_dtype=torch.float16)
+        self.pipe.to("cuda")
+
 
     def generate(self, prompt: str, img_size: int = 512):
         assert len(prompt), "prompt parameter cannot be empty"
 
-        image = self.pipe(prompt, height=img_size, width=img_size).images[0]
+        image = self.pipe(
+            prompt, height=img_size, width=img_size).images[0]
 
         return image
 
