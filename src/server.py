@@ -122,7 +122,7 @@ def submit_service(model_id, model_path, local=False):
                             RANDOM=str(uuid.uuid4())
                         )
                     ),
-                    entrypoint=f"cd src/service && serve run --non-blocking --runtime-env-json='{json.dumps(service_runtime_env)}' serve_model:entrypoint",
+                    entrypoint=f"serve run --non-blocking src.service.serve_model:entrypoint",
                     access="public"
                 )
             )
