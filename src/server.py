@@ -1,7 +1,7 @@
 """Simple stable diffusion app.
 
 How to run:
-    $ uvicorn server:app --reload
+    $ cd src/ && uvicorn server:app --reload
 
 How to test:
 """
@@ -24,6 +24,7 @@ from anyscale.sdk.anyscale_client.models import (
 from anyscale import AnyscaleSDK
 import logging
 
+# local module
 from db_client import DBClient
 
 app = FastAPI()
