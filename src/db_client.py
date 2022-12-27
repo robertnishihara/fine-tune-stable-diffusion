@@ -1,15 +1,15 @@
 import dbm
 from fastapi import HTTPException
-storage_path = "storage"  # db automatically appended
 
 
-class DBClient:
-    def __init__(self, model: str, path: str = storage_path):
-        self.path = path
+class _DBClient:
+    db_name = None
+    def __init__(self, model: str):
+        assert self.db_name is not None, "db_name must be set"
         self.model = model
 
     def __enter__(self):
-        self.db = dbm.open(self.path, "c")
+        self.db = dbm.open(self.db_name, "c")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -45,3 +45,10 @@ class DBClient:
 
     def __setitem__(self, key: str, value: str):
         self.set(key, value)
+
+
+class ServingDBClient(_DBClient):
+    db_name = "serving"
+
+class TrainingDBClient(_DBClient):
+    db_name = "training"
