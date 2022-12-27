@@ -28,6 +28,48 @@ app = FastAPI()
 storage_path = "storage"  # db automatically appended
 
 
+class DBClient:
+    def __init__(self, model: str, path: str = storage_path):
+        self.path = path
+        self.model = model
+
+    def __enter__(self):
+        self.db = dbm.open(self.path, "c")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.db.close()
+
+    def get(self, key: str) -> str:
+        try:
+            return self.db.get(f"{self.model}:{key}").decode()
+        except AttributeError:
+            raise HTTPException(status_code=400, detail=f"Item {self.model, key} not found") from None
+
+    def set(self, key: str, value: str):
+        self.db[f"{self.model}:{key}"] = value
+
+    def delete(self, key: str):
+        del self.db[f"{self.model}:{key}"]
+
+    def clear_all(self):
+        for key in self.db.keys():
+            if key.decode().startswith(f"{self.model}:"):
+                del self.db[key]
+
+    def has_entries(self):
+        for key in self.db.keys():
+            if key.decode().startswith(f"{self.model}:"):
+                return True
+        return False
+
+    def __getitem__(self, key: str) -> str:
+        return self.get(key)
+
+    def __setitem__(self, key: str, value: str):
+        self.set(key, value)
+
+
 def s3_exists(s3filepath):
     import boto3
     import botocore
@@ -143,16 +185,15 @@ async def deploy(model_id: str, model_path: Optional[str] = None):
         local = True
 
     if model_path is None:
-        with dbm.open(storage_path, "c") as db:
-            model_path = db[f"{model_id}_path"]
+        with DBClient(model=model_id) as db:
+            model_path = db["path"]
 
     result = submit_service(model_id, model_path, local=local)
-    with dbm.open(storage_path, "c") as db:
-        db[model_id] = "deployed"
-        db[f"{model_id}_url"] = str(result.url)
-        db[f"{model_id}_service_id"] = str(result.id)
-        db[f"{model_id}_service_name"] = str(result.name)
-        db[f"{model_id}_token"] = get_service_token(result.id)
+    with DBClient(model=model_id) as db:
+        db["url"] = result.url
+        db["service_id"] = str(result.id)
+        db["service_name"] = str(result.name)
+        db["token"] = get_service_token(result.id)
         print("URL: ", result.url)
         print("service_id", result.id)
         print("service_name", str(result.name))
@@ -163,22 +204,34 @@ async def deploy(model_id: str, model_path: Optional[str] = None):
         "model_url": result.url
     }
 
+
+@app.post("/terminate/{model_id}")
+async def terminate(model_id: str):
+    sdk = AnyscaleSDK()
+    with DBClient(model=model_id) as db:
+        service_id = db["service_id"]
+        response = sdk.terminate_service(service_id)
+        db.clear_all()
+    return {
+        "message": "Terminated model successfully!",
+        "model_id": model_id,
+    }
+
+
 def get_service_token(service_id):
-    from anyscale import AnyscaleSDK
     sdk = AnyscaleSDK()
     service = sdk.get_service(service_id).result
     return service.token
 
 def get_service_url(service_id, model_id, cache=True):
-    from anyscale import AnyscaleSDK
     sdk = AnyscaleSDK()
     service = sdk.get_service(service_id).result
     service_url = service.url
     if service_url is None:
         raise ValueError("Service URL is None")
     if cache:
-        with dbm.open(storage_path, "c") as db:
-            db[f"{model_id}_url"] = str(service_url)
+        with DBClient(model=model_id) as db:
+            db["url"] = str(service_url)
     return service.url
 
 @app.get(
@@ -196,15 +249,15 @@ async def query_model(
         model_url = override_model_url
         service_token = override_token
     else:
-        with dbm.open(storage_path, "c") as db:
-            if model_id not in db:
+        with DBClient(model=model_id) as db:
+            if not db.has_entries():
                 raise HTTPException(
                     status_code=404,
                     detail=f"Model with ID {model_id} not found"
                 )
-            model_url = db[f"{model_id}_url"].decode() # to str
-            service_token = db[f"{model_id}_token"].decode() # to str
-            service_id = db[f"{model_id}_service_id"].decode() # to str
+            model_url = db["url"]
+            service_token = db["token"]
+            service_id = db["service_id"]
             print(model_url, type(model_url))
 
         if not model_url.startswith("http"):
@@ -222,6 +275,12 @@ async def query_model(
     response = requests.get(
         f"{model_url}/imagine?{encoded_prompt}",
         headers={"Authorization": f"Bearer {service_token}"})
+    if response.status_code != 200:
+        print(response.text)
+        raise HTTPException(
+            status_code=response.status_code,
+            detail=response.text
+        )
     return Response(
         content=response.content,
         media_type="image/png",
