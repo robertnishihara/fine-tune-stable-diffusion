@@ -9,7 +9,10 @@ from typing import Optional
 import os
 # dumb basic storage
 import dbm
+import uuid
+import json
 from fastapi import FastAPI, UploadFile, HTTPException
+from fastapi.logger import logger
 from pydantic import Field
 from fastapi.responses import Response
 
@@ -19,8 +22,6 @@ from anyscale.sdk.anyscale_client.models import (
 )
 from anyscale import AnyscaleSDK
 import logging
-
-logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -88,6 +89,7 @@ def submit_anyscale_job(files, file_directory, job_name):
     ))
     return job
 
+
 def submit_service(model_id, model_path, local=False):
     from types import SimpleNamespace
     if local:
@@ -98,9 +100,9 @@ def submit_service(model_id, model_path, local=False):
         result.url = "http://localhost:8001"
     else:
         assert s3_exists(model_path), f"{model_path} does not exist on s3."
-
         sdk = AnyscaleSDK()
-        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # current_dir = os.path.dirname(os.path.abspath(__file__))
+        service_runtime_env = {"working_dir": ".", "env_vars": {"MODEL_PATH": model_path}}
         response = sdk.apply_service(
             create_production_service=CreateProductionService(
                 name=f"stable-diffusion-{model_id}",
@@ -117,16 +119,17 @@ def submit_service(model_id, model_path, local=False):
                     runtime_env=dict(
                         working_dir="https://github.com/robertnishihara/fine-tune-stable-diffusion/archive/refs/heads/main.zip",
                         env_vars=dict(
-                            MODEL_PATH=model_path
+                            RANDOM=str(uuid.uuid4())
                         )
                     ),
-                    entrypoint="cd src/service && serve run --non-blocking serve_model:entrypoint",
+                    entrypoint=f"cd src/service && serve run --non-blocking --runtime-env-json='{json.dumps(service_runtime_env)}' serve_model:entrypoint",
                     access="public"
                 )
             )
         )
         result = response.result
-        logger.info(result.url)
+        print(f"Service deployment url: {result.url}")
+
     return result
 
 @app.get("/")
@@ -137,7 +140,9 @@ async def root():
 @app.post("/deploy/{model_id}")
 async def deploy(model_id: str, model_path: Optional[str] = None):
     # TODO: deploy model to Anyscale
-    local = model_id == "TEST"
+    local = False
+    if model_id == "TEST":
+        local = True
 
     if model_path is None:
         with dbm.open(storage_path, "c") as db:
@@ -151,8 +156,8 @@ async def deploy(model_id: str, model_path: Optional[str] = None):
         db[f"{model_id}_service_name"] = str(result.name)
         db[f"{model_id}_token"] = get_service_token(result.id)
         print("URL: ", result.url)
-        print("service_id", service_id)
-        print("service_name", service_name)
+        print("service_id", result.id)
+        print("service_name", str(result.name))
         print("Token: ", get_service_token(result.id))
     return {
         "message": "Deployed model successfully!",
