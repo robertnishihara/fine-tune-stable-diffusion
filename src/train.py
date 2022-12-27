@@ -20,6 +20,7 @@ See test_photos/ for an example.
 
 # Initializing Ray just to get the stdout.
 import ray
+
 ray.init()
 
 import math
@@ -37,7 +38,12 @@ from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import set_seed
 from datasets import load_dataset
-from diffusers import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
+from diffusers import (
+    AutoencoderKL,
+    DDPMScheduler,
+    StableDiffusionPipeline,
+    UNet2DConditionModel,
+)
 from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version
 from diffusers.utils.import_utils import is_xformers_available
@@ -47,16 +53,16 @@ from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
 # SOME THINGS THAT NEED CUSTOMIZATION
-image_column = "image" #args.image_column
-caption_column = "text" #args.caption_column
+image_column = "image"  # args.image_column
+caption_column = "text"  # args.caption_column
 resolution = 512
 # OPTIONALLY CONFIGURE
 center_crop = True
 random_flip = True
 gradient_accumulation_steps = 1
 mixed_precision = None
-report_to = None #"tensorboard"
-train_batch_size = 1 #16
+report_to = None  # "tensorboard"
+train_batch_size = 1  # 16
 num_train_epochs = 2
 lr_scheduler = "constant"
 lr_warmup_steps = 500
@@ -78,14 +84,17 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--image-dir", type=str)
 args = parser.parse_args()
 
+
 def get_images_in_folder(folder: str) -> Iterable[Path]:
     return list(Path(folder).glob("*.png"))
+
 
 def get_image_dir(args):
     if not args.image_dir:
         print("Image dir not specified, using default")
-        parent_path = os.path.dirname( # repo_base/
-            os.path.dirname(os.path.realpath(__file__))) # src/
+        parent_path = os.path.dirname(  # repo_base/
+            os.path.dirname(os.path.realpath(__file__))
+        )  # src/
 
         image_dir = os.path.expanduser(os.path.join(parent_path, "test_photos"))
     elif not os.path.exists(args.image_dir):
@@ -102,6 +111,7 @@ def validate_image_dir(image_dir: str):
 
     # Validate that captions match image names
     import json
+
     with open(os.path.join(image_dir, "captions.json")) as f:
         captions = json.load(f)
         images = get_images_in_folder(image_dir)
@@ -115,51 +125,52 @@ validate_image_dir(image_dir)
 
 
 tokenizer = CLIPTokenizer.from_pretrained(
-    model_id, #args.pretrained_model_name_or_path,
+    model_id,  # args.pretrained_model_name_or_path,
     subfolder="tokenizer",
-    revision=None, #revision=args.revision
+    revision=None,  # revision=args.revision
 )
 
 text_encoder = CLIPTextModel.from_pretrained(
-    model_id, #args.pretrained_model_name_or_path,
+    model_id,  # args.pretrained_model_name_or_path,
     subfolder="text_encoder",
-    revision=None, #args.revision,
+    revision=None,  # args.revision,
 )
 
 vae = AutoencoderKL.from_pretrained(
-    model_id, #args.pretrained_model_name_or_path,
+    model_id,  # args.pretrained_model_name_or_path,
     subfolder="vae",
-    revision=None, #args.revision,
+    revision=None,  # args.revision,
 )
 unet = UNet2DConditionModel.from_pretrained(
-    model_id, #args.pretrained_model_name_or_path,
+    model_id,  # args.pretrained_model_name_or_path,
     subfolder="unet",
-    revision=None, #args.revision,
+    revision=None,  # args.revision,
 )
 
 vae.requires_grad_(False)
 text_encoder.requires_grad_(False)
 
-#optimizer_cls = bnb.optim.AdamW8bit
+# optimizer_cls = bnb.optim.AdamW8bit
 optimizer_cls = torch.optim.AdamW
 optimizer = optimizer_cls(
     unet.parameters(),
-    lr=1e-4, #args.learning_rate,
-    betas=(0.9, 0.999), #(args.adam_beta1, args.adam_beta2),
-    weight_decay=1e-2, #args.adam_weight_decay,
-    eps=1e-08, #args.adam_epsilon,
+    lr=1e-4,  # args.learning_rate,
+    betas=(0.9, 0.999),  # (args.adam_beta1, args.adam_beta2),
+    weight_decay=1e-2,  # args.adam_weight_decay,
+    eps=1e-08,  # args.adam_epsilon,
 )
 noise_scheduler = DDPMScheduler.from_pretrained(
-    model_id, #args.pretrained_model_name_or_path,
-    subfolder="scheduler"
+    model_id, subfolder="scheduler"  # args.pretrained_model_name_or_path,
 )
 
 
 # Data
 
+
 def create_dataset_from_folder(folder: str):
     from datasets import load_dataset, Image, Dataset, Value, DatasetDict
     import json
+
     images = get_images_in_folder(folder)
     data_dict = {"image": [image_path.as_posix() for image_path in images]}
     with open(os.path.join(folder, "captions.json"), "r") as f:
@@ -171,6 +182,7 @@ def create_dataset_from_folder(folder: str):
     dataset = dataset.cast_column("text", Value("string"))
     dataset = DatasetDict({"train": dataset})
     return dataset
+
 
 dataset = create_dataset_from_folder(image_dir)
 
@@ -188,19 +200,33 @@ def tokenize_captions(examples, is_train=True):
             raise ValueError(
                 f"Caption column `{caption_column}` should contain either strings or lists of strings."
             )
-    inputs = tokenizer(captions, max_length=tokenizer.model_max_length, padding="do_not_pad", truncation=True)
+    inputs = tokenizer(
+        captions,
+        max_length=tokenizer.model_max_length,
+        padding="do_not_pad",
+        truncation=True,
+    )
     input_ids = inputs.input_ids
     return input_ids
 
+
 train_transforms = transforms.Compose(
     [
-        transforms.Resize((resolution, resolution), interpolation=transforms.InterpolationMode.BILINEAR),
-        transforms.CenterCrop(resolution) if center_crop else transforms.RandomCrop(resolution),
-        transforms.RandomHorizontalFlip() if random_flip else transforms.Lambda(lambda x: x),
+        transforms.Resize(
+            (resolution, resolution),
+            interpolation=transforms.InterpolationMode.BILINEAR,
+        ),
+        transforms.CenterCrop(resolution)
+        if center_crop
+        else transforms.RandomCrop(resolution),
+        transforms.RandomHorizontalFlip()
+        if random_flip
+        else transforms.Lambda(lambda x: x),
         transforms.ToTensor(),
         transforms.Normalize([0.5], [0.5]),
     ]
 )
+
 
 def preprocess_train(examples):
     images = [image.convert("RGB") for image in examples[image_column]]
@@ -208,6 +234,7 @@ def preprocess_train(examples):
     examples["input_ids"] = tokenize_captions(examples)
 
     return examples
+
 
 accelerator = Accelerator(
     gradient_accumulation_steps=gradient_accumulation_steps,
@@ -220,22 +247,28 @@ with accelerator.main_process_first():
     # Set the training transforms
     train_dataset = dataset["train"].with_transform(preprocess_train)
 
+
 def collate_fn(examples):
     pixel_values = torch.stack([example["pixel_values"] for example in examples])
     pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
     input_ids = [example["input_ids"] for example in examples]
-    padded_tokens = tokenizer.pad({"input_ids": input_ids}, padding=True, return_tensors="pt")
+    padded_tokens = tokenizer.pad(
+        {"input_ids": input_ids}, padding=True, return_tensors="pt"
+    )
     return {
         "pixel_values": pixel_values,
         "input_ids": padded_tokens.input_ids,
         "attention_mask": padded_tokens.attention_mask,
     }
 
+
 train_dataloader = torch.utils.data.DataLoader(
     train_dataset, shuffle=True, collate_fn=collate_fn, batch_size=train_batch_size
 )
 
-num_update_steps_per_epoch = math.ceil(len(train_dataloader) / gradient_accumulation_steps)
+num_update_steps_per_epoch = math.ceil(
+    len(train_dataloader) / gradient_accumulation_steps
+)
 
 lr_scheduler = get_scheduler(
     lr_scheduler,
@@ -265,24 +298,30 @@ vae.to(accelerator.device, dtype=weight_dtype)
 #     ema_unet = EMAModel(unet.parameters())
 
 # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-num_update_steps_per_epoch = math.ceil(len(train_dataloader) / gradient_accumulation_steps)
+num_update_steps_per_epoch = math.ceil(
+    len(train_dataloader) / gradient_accumulation_steps
+)
 # Afterwards we recalculate our number of training epochs
 num_train_epochs = math.ceil(max_train_steps / num_update_steps_per_epoch)
 
 # We need to initialize the trackers we use, and also store our configuration.
 # The trackers initializes automatically on the main process.
-#if accelerator.is_main_process:
+# if accelerator.is_main_process:
 #    accelerator.init_trackers("text2image-fine-tune", config=vars(args))
 # TODO: THE FACT THAT I COMMENTED OUT THE ABOVE MAY CAUSE PROBLEMS
 
 # Train!
-total_batch_size = train_batch_size * accelerator.num_processes * gradient_accumulation_steps
+total_batch_size = (
+    train_batch_size * accelerator.num_processes * gradient_accumulation_steps
+)
 
 logger.info("***** Running training *****")
 logger.info(f"  Num examples = {len(train_dataset)}")
 logger.info(f"  Num Epochs = {num_train_epochs}")
 logger.info(f"  Instantaneous batch size per device = {train_batch_size}")
-logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
+logger.info(
+    f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
+)
 logger.info(f"  Gradient Accumulation steps = {gradient_accumulation_steps}")
 logger.info(f"  Total optimization steps = {max_train_steps}")
 global_step = 0
@@ -293,7 +332,9 @@ if resume_from_checkpoint:
     raise NotImplementedError
 
 # Only show the progress bar once on each machine.
-progress_bar = tqdm(range(global_step, max_train_steps), disable=not accelerator.is_local_main_process)
+progress_bar = tqdm(
+    range(global_step, max_train_steps), disable=not accelerator.is_local_main_process
+)
 progress_bar.set_description("Steps")
 
 for epoch in range(first_epoch, num_train_epochs):
@@ -308,14 +349,18 @@ for epoch in range(first_epoch, num_train_epochs):
 
         with accelerator.accumulate(unet):
             # Convert images to latent space
-            latents = vae.encode(batch["pixel_values"].to(weight_dtype)).latent_dist.sample()
+            latents = vae.encode(
+                batch["pixel_values"].to(weight_dtype)
+            ).latent_dist.sample()
             latents = latents * 0.18215
 
             # Sample noise that we'll add to the latents
             noise = torch.randn_like(latents)
             bsz = latents.shape[0]
             # Sample a random timestep for each image
-            timesteps = torch.randint(0, noise_scheduler.num_train_timesteps, (bsz,), device=latents.device)
+            timesteps = torch.randint(
+                0, noise_scheduler.num_train_timesteps, (bsz,), device=latents.device
+            )
             timesteps = timesteps.long()
 
             # Add noise to the latents according to the noise magnitude at each timestep
@@ -331,7 +376,9 @@ for epoch in range(first_epoch, num_train_epochs):
             elif noise_scheduler.config.prediction_type == "v_prediction":
                 target = noise_scheduler.get_velocity(latents, noise, timesteps)
             else:
-                raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+                raise ValueError(
+                    f"Unknown prediction type {noise_scheduler.config.prediction_type}"
+                )
 
             # Predict the noise residual and compute loss
             model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
@@ -387,15 +434,15 @@ if accelerator.is_main_process:
     #     ema_unet.copy_to(unet.parameters())
 
     pipeline = StableDiffusionPipeline.from_pretrained(
-        model_id, #args.pretrained_model_name_or_path,
+        model_id,  # args.pretrained_model_name_or_path,
         text_encoder=text_encoder,
         vae=vae,
         unet=unet,
-        revision=None, #args.revision,
+        revision=None,  # args.revision,
     )
     pipeline.save_pretrained(output_dir)
 
     # if args.push_to_hub:
     #     repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)
 
-#accelerator.end_training()
+# accelerator.end_training()
