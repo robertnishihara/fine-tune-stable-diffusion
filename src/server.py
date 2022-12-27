@@ -10,7 +10,7 @@ import os
 # dumb basic storage
 import dbm
 import uuid
-import json
+import tempfile
 from fastapi import FastAPI, UploadFile, HTTPException
 from fastapi.logger import logger
 from pydantic import Field
@@ -49,8 +49,6 @@ def s3_exists(s3filepath):
 
 
 def submit_anyscale_job(files, file_directory, job_name):
-    import yaml
-
     sdk = AnyscaleSDK()
     runtime_env = {
         "working_dir": file_directory,
@@ -95,7 +93,7 @@ def submit_service(model_id, model_path, local=False):
     if local:
         import subprocess
         # This is probably all broken rn
-        subprocess.run(["python", "service/serve_model.py", "--test"])
+        subprocess.run("serve run src.service.serve_model:entrypoint".split(" "))
         result = SimpleNamespace()
         result.url = "http://localhost:8001"
     else:
@@ -122,7 +120,7 @@ def submit_service(model_id, model_path, local=False):
                             MODEL_PATH=model_path
                         )
                     ),
-                    entrypoint=f"serve run --non-blocking src.service.serve_model:entrypoint",
+                    entrypoint="serve run --non-blocking src.service.serve_model:entrypoint",
                     access="public"
                 )
             )
@@ -236,9 +234,6 @@ async def create_upload_files(
         files: list[UploadFile], captions: list[str],
         job_name: str = None):
     # write files to temporary directory on local disk
-    import os
-    import tempfile
-
     captions = [caption.strip() for caption in captions]
     captions_json = {}
     # create temporary directory
