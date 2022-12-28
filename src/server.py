@@ -72,7 +72,7 @@ def submit_anyscale_job(job_name, data_path, model_path):
     job_config.update({
         # The id of the cluster env build - why can't we pass in the env name
         "build_id": "bld_hu28yb4llwb66fxh3cd9dzh9ty",
-        "entrypoint": f"python src/train.py --image-dir {data_path} --output {model_path}",
+        "entrypoint": f"python src/train.py --image-data-path {data_path} --output {model_path}",
         "max_retries": 3,
     })
 

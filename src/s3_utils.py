@@ -69,3 +69,25 @@ def unzip_dir(zip_path, target_path):
 
     shutil.unpack_archive(zip_path, target_path)
     return target_path
+
+
+def tar_dir(file_directory, target_path):
+    import tarfile
+    import os
+
+    # if ends with tar.gz, remove from target path
+    if target_path.endswith(".tar.gz"):
+        target_path = target_path[:-7]
+    with tarfile.open(target_path + ".tar.gz", "w:gz") as tar:
+        tar.add(file_directory, arcname=os.path.basename(file_directory))
+    return target_path + ".tar.gz"
+
+
+def untar_dir(tar_file_path: str, target_path: str) -> str:
+    # Returns absolute path to the extracted folder
+    import tarfile
+
+    tar = tarfile.open(tar_file_path, "r:gz")
+    tar.extractall(target_path)
+    tar.close()
+    return target_path
