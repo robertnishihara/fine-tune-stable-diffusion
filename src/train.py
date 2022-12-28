@@ -52,7 +52,7 @@ from torchvision import transforms
 from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
-from s3_utils import download_file_from_s3, s3_exists, tar_dir, upload_file_to_s3
+from s3_utils import download_file_from_s3, s3_exists, tar_dir, write_to_s3, unzip_dir
 
 # SOME THINGS THAT NEED CUSTOMIZATION
 image_column = "image"  # args.image_column
@@ -107,7 +107,9 @@ def get_image_dir(args):
             import tempfile
             temp_dir = tempfile.mkdtemp(suffix="data")
 
-            zipped_image_dir = download_file_from_s3(args.image_data_path, target_path=temp_dir)
+            zipped_image_dir = download_file_from_s3(
+                args.image_data_path, target_path=os.path.join(temp_dir, "data.zip"))
+            print(f"Downloaded file from {args.image_data_path}")
             unzip_dir(zipped_image_dir, target_path=temp_dir)
             image_dir = temp_dir
         else:
@@ -456,11 +458,11 @@ if accelerator.is_main_process:
     pipeline.save_pretrained(output_dir)
 
     # upload to s3
-    if args.output_path and args.output_path.startswith("s3://"):
-        target_dir = os.path.dirname(output_dir)
-        compressed_file = tar_dir(output_dir, target_dir)
+    if args.output and args.output.startswith("s3://"):
+        target_file = os.path.join(os.path.dirname(output_dir), "model")
+        compressed_file = tar_dir(output_dir, target_file)
         logger.info(f"Saved pipeline to {compressed_file}")
-        write_to_s3(compressed_file, args.output_path)
+        write_to_s3(compressed_file, args.output)
 
 
 
