@@ -3,7 +3,7 @@
 
 How to use:
 
-    python train.py --image-dir="s3://bucket/data.zip" --output="s3://bucket/model.zip"
+    python train.py --image-data-path="s3://bucket/data.zip" --output="s3://bucket/model.zip"
 
 Image directory must contain images and captions in json format.
 
@@ -52,7 +52,7 @@ from torchvision import transforms
 from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
-from s3_utils import download_file_from_s3, s3_exists
+from s3_utils import download_file_from_s3, s3_exists, tar_dir, upload_file_to_s3
 
 # SOME THINGS THAT NEED CUSTOMIZATION
 image_column = "image"  # args.image_column
@@ -75,7 +75,7 @@ max_train_steps = 5
 
 logger = get_logger(__name__)
 
-output_dir = "sd-model-finetuned"
+output_dir = os.path.abspath("sd-model-finetuned")
 logging_dir = os.path.join(output_dir, "logs")
 model_id = "stabilityai/stable-diffusion-2"
 
@@ -83,7 +83,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 # Zip path for images
-parser.add_argument("--image-dir", type=str)
+parser.add_argument("--image-data-path", type=str)
 parser.add_argument("--output", type=str)
 args = parser.parse_args()
 
@@ -454,6 +454,15 @@ if accelerator.is_main_process:
         revision=None,  # args.revision,
     )
     pipeline.save_pretrained(output_dir)
+
+    # upload to s3
+    if args.output_path and args.output_path.startswith("s3://"):
+        target_dir = os.path.dirname(output_dir)
+        compressed_file = tar_dir(output_dir, target_dir)
+        logger.info(f"Saved pipeline to {compressed_file}")
+        write_to_s3(compressed_file, args.output_path)
+
+
 
     # if args.push_to_hub:
     #     repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)

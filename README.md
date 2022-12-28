@@ -14,7 +14,8 @@ Overall application architecture:
     - [ ] Querying a real model remotely and rendering the right output
     - [ ] Querying any model remotely and rendering the right output
   - [ ] Deploying models
-    - [ ]
+    - [ ] Right now there's tar and zip; we should just standardize
+    - [ ] Move the service.py out of service/ so that we can use the utils
 
 
 
