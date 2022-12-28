@@ -52,11 +52,11 @@ def validate_model_path(model_path, post_training=False):
         )
 
 
-def submit_anyscale_job(job_name, data_path, model_path):
+def submit_training_job(job_name, data_path, model_path):
     """Submitting a job to Anyscale.
 
     Example usage:
-        submit_anyscale_job(
+        submit_training_job(
             job_name="test-job",
             data_path="s3://anyscale-temp/diffusion-demo/data.zip",
             model_path="s3://anyscale-temp/diffusion-demo/model.zip",
@@ -69,7 +69,20 @@ def submit_anyscale_job(job_name, data_path, model_path):
     with open("job.yaml", "r") as f:
         job_config = yaml.safe_load(f)
 
+    runtime_env = job_config.get("runtime_env", {})
+
+    if "AWS_ACCESS_KEY_ID" not in os.environ:
+        raise ValueError(
+            "AWS_ACCESS_KEY_ID needs to be set in the environment. "
+        )
+    runtime_env.update({
+        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+        "AWS_SESSION_TOKEN": os.environ["AWS_SESSION_TOKEN"],
+    })
+
     job_config.update({
+        "runtime_env": runtime_env,
         # The id of the cluster env build - why can't we pass in the env name
         "build_id": "bld_hu28yb4llwb66fxh3cd9dzh9ty",
         "entrypoint": f"python src/train.py --image-data-path {data_path} --output {model_path}",
@@ -285,7 +298,7 @@ async def submit_train_job(
         write_to_s3(zipped_files, data_path)
 
     model_path = os.path.join(s3_dir, f"{job_name}/model.zip")
-    anyscale_job = submit_anyscale_job(job_name, data_path, model_path)
+    anyscale_job = submit_training_job(job_name, data_path, model_path)
     print("Job submitted: ", anyscale_job.id, anyscale_job.name)
 
 
