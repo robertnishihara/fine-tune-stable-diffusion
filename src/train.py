@@ -3,7 +3,7 @@
 
 How to use:
 
-    python train.py --image-dir /path/to/images
+    python train.py --image-dir="s3://bucket/data.zip" --output="s3://bucket/model.zip"
 
 Image directory must contain images and captions in json format.
 
@@ -52,6 +52,8 @@ from torchvision import transforms
 from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
+from s3_utils import download_file_from_s3, s3_exists
+
 # SOME THINGS THAT NEED CUSTOMIZATION
 image_column = "image"  # args.image_column
 caption_column = "text"  # args.caption_column
@@ -80,9 +82,11 @@ model_id = "stabilityai/stable-diffusion-2"
 import argparse
 
 parser = argparse.ArgumentParser()
-# Directory for images
+# Zip path for images
 parser.add_argument("--image-dir", type=str)
+parser.add_argument("--output", type=str)
 args = parser.parse_args()
+
 
 
 def get_images_in_folder(folder: str) -> Iterable[Path]:
@@ -90,17 +94,26 @@ def get_images_in_folder(folder: str) -> Iterable[Path]:
 
 
 def get_image_dir(args):
-    if not args.image_dir:
+    if not args.image_data_path:
         print("Image dir not specified, using default")
         parent_path = os.path.dirname(  # repo_base/
             os.path.dirname(os.path.realpath(__file__))
         )  # src/
 
         image_dir = os.path.expanduser(os.path.join(parent_path, "test_photos"))
-    elif not os.path.exists(args.image_dir):
-        raise ValueError(f"Image directory {args.image_dir} does not exist")
+    elif not os.path.exists(args.image_data_path):
+        if args.image_data_path.startswith("s3://") and s3_exists(args.image_data_path):
+            # create temp dir
+            import tempfile
+            temp_dir = tempfile.mkdtemp(suffix="data")
+
+            zipped_image_dir = download_file_from_s3(args.image_data_path, target_path=temp_dir)
+            unzip_dir(zipped_image_dir, target_path=temp_dir)
+            image_dir = temp_dir
+        else:
+            raise ValueError(f"Image directory {args.image_data_path} does not exist")
     else:
-        image_dir = args.image_dir
+        image_dir = args.image_data_path
     return image_dir
 
 
@@ -398,8 +411,8 @@ for epoch in range(first_epoch, num_train_epochs):
 
         # Checks if the accelerator has performed an optimization step behind the scenes
         if accelerator.sync_gradients:
-            if use_ema:
-                ema_unet.step(unet.parameters())
+            # if use_ema:
+            #     ema_unet.step(unet.parameters())
             progress_bar.update(1)
             global_step += 1
             # accelerator.log({"train_loss": train_loss}, step=global_step)

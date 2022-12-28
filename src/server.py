@@ -26,50 +26,12 @@ import logging
 
 # local module
 from db_client import TrainingDBClient, ServingDBClient
+from s3_utils import write_to_s3, s3_exists, zip_dir
 
 app = FastAPI()
 
 s3_dir = "s3://anyscale-temp/diffusion-demo"
 
-
-def s3_exists(s3filepath):
-    import boto3
-    import botocore
-
-    s3 = boto3.resource("s3")
-    s3filepath = s3filepath[5:]  # remove s3://
-
-    bucket_name, key = s3filepath.split("/", 1)
-
-    try:
-        s3.Object(bucket_name, key).load()
-    except botocore.exceptions.ClientError as e:
-        if e.response["Error"]["Code"] == "404":
-            return False
-        else:
-            # Something else has gone wrong.
-            raise
-    return True
-
-def zip_dir(file_directory, target_path):
-    import shutil
-    import os
-
-    # if ends with zip, remove from target path
-    if target_path.endswith(".zip"):
-        target_path = target_path[:-4]
-    shutil.make_archive(target_path, "zip", file_directory)
-    return target_path + ".zip"
-
-def write_to_s3(local_file, s3_target_path):
-    import boto3
-
-    s3 = boto3.resource("s3")
-    s3_target_path = s3_target_path[5:]  # remove s3://
-
-    bucket_name, key = s3_target_path.split("/", 1)
-    s3.Bucket(bucket_name).upload_file(local_file, key)
-    print(f"Uploaded {local_file} to {s3_target_path}")
 
 def validate_model_path(model_path, post_training=False):
     if not model_path.startswith("s3://"):
@@ -91,6 +53,15 @@ def validate_model_path(model_path, post_training=False):
 
 
 def submit_anyscale_job(job_name, data_path, model_path):
+    """Submitting a job to Anyscale.
+
+    Example usage:
+        submit_anyscale_job(
+            job_name="test-job",
+            data_path="s3://anyscale-temp/diffusion-demo/data.zip",
+            model_path="s3://anyscale-temp/diffusion-demo/model.zip",
+        )
+    """
     validate_model_path(model_path)
     sdk = AnyscaleSDK()
     import yaml
@@ -101,7 +72,7 @@ def submit_anyscale_job(job_name, data_path, model_path):
     job_config.update({
         # The id of the cluster env build - why can't we pass in the env name
         "build_id": "bld_hu28yb4llwb66fxh3cd9dzh9ty",
-        "entrypoint": f"python train.py --image-dir {data_path} --output {model_path}",
+        "entrypoint": f"python src/train.py --image-dir {data_path} --output {model_path}",
         "max_retries": 3,
     })
 

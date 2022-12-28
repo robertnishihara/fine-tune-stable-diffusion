@@ -9,4 +9,6 @@ entrypoint: <<<ENTRYPOINT>>>
 compute_config_id: cpt_zryduns2gxt82pjqxbhsbv4aej
 cluster_env: fine-tune-stable-diffusion:3
 runtime_env:
-  working_dir: https://github.com/robertnishihara/fine-tune-stable-diffusion/archive/refs/heads/main.zip
+  working_dir: https://github.com/robertnishihara/fine-tune-stable-diffusion/archive/refs/heads/training-fix.zip
+
+
