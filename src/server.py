@@ -38,6 +38,16 @@ AWS_ACCESS_VARS = {
     "AWS_SESSION_TOKEN": os.environ["AWS_SESSION_TOKEN"],
 }
 
+github_zip_template = "https://github.com/robertnishihara/fine-tune-stable-diffusion/archive/refs/heads/{branch_name}.zip"
+
+# get current github branch name
+def get_branch_name():
+    import subprocess
+
+    branch = subprocess.check_output(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"]
+    ).decode("utf-8")
+    return branch.strip()
 
 def validate_model_path(model_path, post_training=False):
     if not model_path.startswith("s3://"):
@@ -81,6 +91,7 @@ def submit_training_job(job_name, data_path, model_path):
         raise ValueError("AWS_ACCESS_KEY_ID needs to be set in the environment. ")
     runtime_env.update(
         {
+            "working_dir": github_zip_template.format(get_branch_name()),
             "env_vars": AWS_ACCESS_VARS,
         }
     )
@@ -136,7 +147,7 @@ def submit_service(model_id, model_path, local=False):
                     # https://console.anyscale-staging.com/o/anyscale-internal/configurations/app-config-details/bld_hu28yb4llwb66fxh3cd9dzh9ty
                     build_id="bld_hu28yb4llwb66fxh3cd9dzh9ty",
                     runtime_env=dict(
-                        working_dir="https://github.com/robertnishihara/fine-tune-stable-diffusion/archive/refs/heads/training-fix.zip",
+                        working_dir=github_zip_template.format(get_branch_name()),
                         env_vars=dict(
                             RANDOM=str(uuid.uuid4()),
                             MODEL_PATH=model_path,
