@@ -3,7 +3,7 @@
 
 How to use:
 
-    python train.py --image-dir /path/to/images
+    python train.py --image-data-path="s3://bucket/data.zip" --output="s3://bucket/model.zip"
 
 Image directory must contain images and captions in json format.
 
@@ -52,6 +52,8 @@ from torchvision import transforms
 from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
+from s3_utils import download_file_from_s3, s3_exists, tar_dir, write_to_s3, unzip_dir
+
 # SOME THINGS THAT NEED CUSTOMIZATION
 image_column = "image"  # args.image_column
 caption_column = "text"  # args.caption_column
@@ -73,15 +75,16 @@ max_train_steps = 5
 
 logger = get_logger(__name__)
 
-output_dir = "sd-model-finetuned"
+output_dir = os.path.abspath("sd-model-finetuned")
 logging_dir = os.path.join(output_dir, "logs")
 model_id = "stabilityai/stable-diffusion-2"
 
 import argparse
 
 parser = argparse.ArgumentParser()
-# Directory for images
-parser.add_argument("--image-dir", type=str)
+# Zip path for images
+parser.add_argument("--image-data-path", type=str)
+parser.add_argument("--output", type=str)
 args = parser.parse_args()
 
 
@@ -90,17 +93,30 @@ def get_images_in_folder(folder: str) -> Iterable[Path]:
 
 
 def get_image_dir(args):
-    if not args.image_dir:
+    if not args.image_data_path:
         print("Image dir not specified, using default")
         parent_path = os.path.dirname(  # repo_base/
             os.path.dirname(os.path.realpath(__file__))
         )  # src/
 
         image_dir = os.path.expanduser(os.path.join(parent_path, "test_photos"))
-    elif not os.path.exists(args.image_dir):
-        raise ValueError(f"Image directory {args.image_dir} does not exist")
+    elif not os.path.exists(args.image_data_path):
+        if args.image_data_path.startswith("s3://") and s3_exists(args.image_data_path):
+            # create temp dir
+            import tempfile
+
+            temp_dir = tempfile.mkdtemp(suffix="data")
+
+            zipped_image_dir = download_file_from_s3(
+                args.image_data_path, target_path=os.path.join(temp_dir, "data.zip")
+            )
+            print(f"Downloaded file from {args.image_data_path}")
+            unzip_dir(zipped_image_dir, target_path=temp_dir)
+            image_dir = temp_dir
+        else:
+            raise ValueError(f"Image directory {args.image_data_path} does not exist")
     else:
-        image_dir = args.image_dir
+        image_dir = args.image_data_path
     return image_dir
 
 
@@ -398,8 +414,8 @@ for epoch in range(first_epoch, num_train_epochs):
 
         # Checks if the accelerator has performed an optimization step behind the scenes
         if accelerator.sync_gradients:
-            if use_ema:
-                ema_unet.step(unet.parameters())
+            # if use_ema:
+            #     ema_unet.step(unet.parameters())
             progress_bar.update(1)
             global_step += 1
             # accelerator.log({"train_loss": train_loss}, step=global_step)
@@ -441,6 +457,13 @@ if accelerator.is_main_process:
         revision=None,  # args.revision,
     )
     pipeline.save_pretrained(output_dir)
+
+    # upload to s3
+    if args.output and args.output.startswith("s3://"):
+        target_file = os.path.join(os.path.dirname(output_dir), "model")
+        compressed_file = tar_dir(output_dir, target_file)
+        logger.info(f"Saved pipeline to {compressed_file}")
+        write_to_s3(compressed_file, args.output)
 
     # if args.push_to_hub:
     #     repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)

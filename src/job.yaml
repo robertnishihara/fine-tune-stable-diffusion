@@ -1,0 +1,14 @@
+entrypoint: <<<ENTRYPOINT>>>
+# compute_config:
+#   cloud_id: cld_401TPoxgB8MM6A0NNQauOV  # anyscale_default_cloud
+#   region: us-west-2
+#   head_node_type:
+#     name: head
+#     instance_type: g5.8xlarge
+#   worker_node_types: []
+compute_config_id: cpt_zryduns2gxt82pjqxbhsbv4aej
+cluster_env: fine-tune-stable-diffusion:3
+runtime_env:
+  working_dir: <<<working_dir>>> # set in code
+
+
