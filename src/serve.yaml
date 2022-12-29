@@ -1,0 +1,4 @@
+# https://console.anyscale-staging.com/o/anyscale-internal/configurations/cluster-computes/cpt_v1hkxu5rd61ql5nd268fen83t7
+compute_config_id: "cpt_v1hkxu5rd61ql5nd268fen83t7"
+# https://console.anyscale-staging.com/o/anyscale-internal/configurations/app-config-details/bld_hu28yb4llwb66fxh3cd9dzh9ty
+access: "public"

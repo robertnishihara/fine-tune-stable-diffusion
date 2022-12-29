@@ -99,7 +99,7 @@ def submit_training_job(job_name, data_path, model_path):
     job_config.update(
         {
             "runtime_env": runtime_env,
-            # The id of the cluster env build - why can't we pass in the env name
+            # The id of the cluster env build - why can't we pass in the cluster env name
             "build_id": "bld_hu28yb4llwb66fxh3cd9dzh9ty",
             "entrypoint": f"python src/train.py --image-data-path {data_path} --output {model_path}",
             "max_retries": 3,
@@ -129,34 +129,39 @@ def submit_service(model_id, model_path, local=False):
         result = SimpleNamespace()
         result.url = "http://localhost:8001"
     else:
+        print("Submitting service for model_path: ", model_path)
         validate_model_path(model_path, post_training=True)
+
+        with open("job.yaml", "r") as f:
+            job_config = yaml.safe_load(f)
+
+        runtime_env = job_config.get("runtime_env", {})
+
+        if "AWS_ACCESS_KEY_ID" not in os.environ:
+            raise ValueError("AWS_ACCESS_KEY_ID needs to be set in the environment. ")
+
+        runtime_env.update(dict(
+            working_dir=github_zip_template.format(get_branch_name()),
+            env_vars=dict(
+                RANDOM=str(uuid.uuid4()),
+                MODEL_PATH=model_path,
+                **AWS_ACCESS_VARS,
+            )
+        ))
+        serve_config.update(
+            runtime_env=runtime_env,
+            entrypoint="serve run --non-blocking src.serve_model:entrypoint",
+            build_id="bld_hu28yb4llwb66fxh3cd9dzh9ty"
+        )
         sdk = AnyscaleSDK()
         # current_dir = os.path.dirname(os.path.abspath(__file__))
-        print("Submitting service for model_path: ", model_path)
         response = sdk.apply_service(
             create_production_service=CreateProductionService(
                 name=f"stable-diffusion-{model_id}",
                 description="Stable diffusion services",
-                # project_id can be found in the URL
-                # https://console.anyscale-staging.com/o/anyscale-internal/projects/prj_j2bynt35acxvgtg6riahpzqk
                 project_id="prj_j2bynt35acxvgtg6riahpzqk",
                 healthcheck_url="/-/healthz",
-                config=dict(
-                    # https://console.anyscale-staging.com/o/anyscale-internal/configurations/cluster-computes/cpt_v1hkxu5rd61ql5nd268fen83t7
-                    compute_config_id="cpt_v1hkxu5rd61ql5nd268fen83t7",
-                    # https://console.anyscale-staging.com/o/anyscale-internal/configurations/app-config-details/bld_hu28yb4llwb66fxh3cd9dzh9ty
-                    build_id="bld_hu28yb4llwb66fxh3cd9dzh9ty",
-                    runtime_env=dict(
-                        working_dir=github_zip_template.format(get_branch_name()),
-                        env_vars=dict(
-                            RANDOM=str(uuid.uuid4()),
-                            MODEL_PATH=model_path,
-                            **AWS_ACCESS_VARS,
-                        ),
-                    ),
-                    entrypoint="serve run --non-blocking src.serve_model:entrypoint",
-                    access="public",
-                ),
+                config=serve_config
             )
         )
         result = response.result
