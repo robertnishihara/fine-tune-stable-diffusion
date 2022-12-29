@@ -23,8 +23,8 @@ How to run the application:
     - [x] Querying any model remotely and rendering the right output
   - [ ] Miscellanous
     - [ ] Right now there's tar and zip; we should just standardize
-    - [ ] Move the service.py out of service/ so that we can use the utils
     - [ ] Right now there's no good way of allowing this service to connect to s3 (for training upload)
+        - (Currently passing in env vars as a hack)
 
 
 
