@@ -8,41 +8,11 @@ from fastapi import FastAPI
 from fastapi.responses import Response
 import logging
 
+from s3_utils import download_file_from_s3, untar_dir
+
 app = FastAPI()
 
 logger = logging.getLogger("ray.serve")
-
-
-def download_file_from_s3(tar_file_s3_path: str, target_path: str) -> str:
-    logger.info(f"Starting s3 download: {tar_file_s3_path}")
-    # Example tar_file_path = "s3://anyscale-temp/diffusion-demo/checkpoint-demo.tar.gz"
-    import boto3
-
-    s3 = boto3.resource("s3")
-    # remove s3:// from the path
-    tar_file_s3_path = tar_file_s3_path[5:]
-
-    bucket_name = tar_file_s3_path.split("/")[0]
-    tar_file_path = "/".join(tar_file_s3_path.split("/")[1:])
-    s3.Bucket(bucket_name).download_file(tar_file_path, target_path)
-    logger.info(
-        f"Downloaded s3 path to local path: {tar_file_s3_path} -> {target_path}"
-    )
-    logger.info(f"Print listdir {os.listdir(os.path.dirname(target_path))}")
-    return target_path
-
-
-def extract_file_from_tar(tar_file_path: str, target_path: str) -> str:
-    logger.info(f"Starting tar extraction: {tar_file_path}")
-    # Returns absolute path to the extracted folder
-    import tarfile
-
-    tar = tarfile.open(tar_file_path, "r:gz")
-    tar.extractall(target_path)
-    tar.close()
-    logger.info(f"Extracted tar: {tar_file_path} -> {target_path}")
-    logger.info(f"Print listdir {os.listdir(os.path.dirname(target_path))}")
-    return target_path
 
 
 @serve.deployment(num_replicas=1, route_prefix="/")
@@ -83,7 +53,7 @@ class StableDiffusionV3:
 
         # model_path = os.path.abspath(download_path.split(".")[0])
         extraction_path = os.path.abspath("./decent")
-        extract_file_from_tar(download_path, target_path=extraction_path)
+        untar_dir(download_path, target_path=extraction_path)
         model_path = os.path.join(extraction_path, "sd-model-finetuned")
         logger.info(f"Loading model into diffusers: {model_path}")
 
