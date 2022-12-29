@@ -4,6 +4,7 @@ from fastapi import HTTPException
 
 class _DBClient:
     db_name = None
+
     def __init__(self, model: str):
         assert self.db_name is not None, "db_name must be set"
         self.model = model
@@ -49,6 +50,7 @@ class _DBClient:
 
 class ServingDBClient(_DBClient):
     db_name = "serving"
+
 
 class TrainingDBClient(_DBClient):
     db_name = "training"

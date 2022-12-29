@@ -88,7 +88,6 @@ parser.add_argument("--output", type=str)
 args = parser.parse_args()
 
 
-
 def get_images_in_folder(folder: str) -> Iterable[Path]:
     return list(Path(folder).glob("*.png"))
 
@@ -105,10 +104,12 @@ def get_image_dir(args):
         if args.image_data_path.startswith("s3://") and s3_exists(args.image_data_path):
             # create temp dir
             import tempfile
+
             temp_dir = tempfile.mkdtemp(suffix="data")
 
             zipped_image_dir = download_file_from_s3(
-                args.image_data_path, target_path=os.path.join(temp_dir, "data.zip"))
+                args.image_data_path, target_path=os.path.join(temp_dir, "data.zip")
+            )
             print(f"Downloaded file from {args.image_data_path}")
             unzip_dir(zipped_image_dir, target_path=temp_dir)
             image_dir = temp_dir
@@ -463,8 +464,6 @@ if accelerator.is_main_process:
         compressed_file = tar_dir(output_dir, target_file)
         logger.info(f"Saved pipeline to {compressed_file}")
         write_to_s3(compressed_file, args.output)
-
-
 
     # if args.push_to_hub:
     #     repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)

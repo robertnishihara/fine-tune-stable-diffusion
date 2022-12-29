@@ -6,6 +6,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
+
 def s3_exists(s3filepath):
     s3 = boto3.resource("s3")
     s3filepath = s3filepath[5:]  # remove s3://
@@ -35,9 +36,7 @@ def download_file_from_s3(s3_path: str, target_path: str) -> str:
     bucket_name = s3_path.split("/")[0]
     s3_key = "/".join(s3_path.split("/")[1:])
     s3.Bucket(bucket_name).download_file(s3_key, target_path)
-    logger.info(
-        f"Downloaded s3 path to local path: {s3_path} -> {target_path}"
-    )
+    logger.info(f"Downloaded s3 path to local path: {s3_path} -> {target_path}")
     logger.info(f"Print listdir {os.listdir(os.path.dirname(target_path))}")
     return target_path
 

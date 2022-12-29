@@ -78,20 +78,22 @@ def submit_training_job(job_name, data_path, model_path):
     runtime_env = job_config.get("runtime_env", {})
 
     if "AWS_ACCESS_KEY_ID" not in os.environ:
-        raise ValueError(
-            "AWS_ACCESS_KEY_ID needs to be set in the environment. "
-        )
-    runtime_env.update({
-        "env_vars": AWS_ACCESS_VARS,
-    })
+        raise ValueError("AWS_ACCESS_KEY_ID needs to be set in the environment. ")
+    runtime_env.update(
+        {
+            "env_vars": AWS_ACCESS_VARS,
+        }
+    )
 
-    job_config.update({
-        "runtime_env": runtime_env,
-        # The id of the cluster env build - why can't we pass in the env name
-        "build_id": "bld_hu28yb4llwb66fxh3cd9dzh9ty",
-        "entrypoint": f"python src/train.py --image-data-path {data_path} --output {model_path}",
-        "max_retries": 3,
-    })
+    job_config.update(
+        {
+            "runtime_env": runtime_env,
+            # The id of the cluster env build - why can't we pass in the env name
+            "build_id": "bld_hu28yb4llwb66fxh3cd9dzh9ty",
+            "entrypoint": f"python src/train.py --image-data-path {data_path} --output {model_path}",
+            "max_retries": 3,
+        }
+    )
 
     response = sdk.create_job(
         CreateProductionJob(
@@ -138,7 +140,7 @@ def submit_service(model_id, model_path, local=False):
                         env_vars=dict(
                             RANDOM=str(uuid.uuid4()),
                             MODEL_PATH=model_path,
-                            **AWS_ACCESS_VARS
+                            **AWS_ACCESS_VARS,
                         ),
                     ),
                     entrypoint="serve run --non-blocking src.service.serve_model:entrypoint",
@@ -273,14 +275,13 @@ async def query_model(
 async def submit_train_job(
     files: list[UploadFile],
     captions: Union[list[str], None] = Query(default=None),
-    job_name: str = None
+    job_name: str = None,
 ):
     from datetime import datetime
 
     if job_name is None:
         # time indexed
         job_name = f"train-{datetime.now().strftime('%Y-%m-%d-%H%M')}"
-
 
     print(captions)
     captions_json = {}
@@ -300,8 +301,7 @@ async def submit_train_job(
             json.dump(captions_json, buffer)
 
         # zip fies in tempdir
-        zipped_files = zip_dir(
-            temp_data_files, os.path.join(temp_dir, "data.zip"))
+        zipped_files = zip_dir(temp_data_files, os.path.join(temp_dir, "data.zip"))
 
         # upload zip to s3
         s3_data_key = f"{job_name}/data.zip"
@@ -311,7 +311,6 @@ async def submit_train_job(
     model_path = os.path.join(s3_dir, f"{job_name}/model.zip")
     anyscale_job = submit_training_job(job_name, data_path, model_path)
     print("Job submitted: ", anyscale_job.id, anyscale_job.name)
-
 
     with TrainingDBClient(model=job_name) as db:
         db["id"] = anyscale_job.id
