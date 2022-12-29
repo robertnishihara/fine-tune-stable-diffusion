@@ -125,7 +125,7 @@ def submit_service(model_id, model_path, local=False):
         import subprocess
 
         # This is probably all broken rn
-        subprocess.run("serve run src.service.serve_model:entrypoint".split(" "))
+        subprocess.run("serve run src.serve_model:entrypoint".split(" "))
         result = SimpleNamespace()
         result.url = "http://localhost:8001"
     else:
@@ -154,7 +154,7 @@ def submit_service(model_id, model_path, local=False):
                             **AWS_ACCESS_VARS,
                         ),
                     ),
-                    entrypoint="serve run --non-blocking src.service.serve_model:entrypoint",
+                    entrypoint="serve run --non-blocking src.serve_model:entrypoint",
                     access="public",
                 ),
             )

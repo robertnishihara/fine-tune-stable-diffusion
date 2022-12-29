@@ -25,7 +25,6 @@ def s3_exists(s3filepath):
 
 
 def download_file_from_s3(s3_path: str, target_path: str) -> str:
-    # This is repeated in 'src/service/serve_model.py'
     logger.info(f"Starting s3 download: {s3_path}")
     # Example tar_file_path = "s3://anyscale-temp/diffusion-demo/checkpoint-demo.tar.gz"
 
