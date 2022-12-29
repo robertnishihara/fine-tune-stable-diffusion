@@ -6,14 +6,22 @@ Overall application architecture:
  - `server.py` - runs a server that coordinates the serving and training
  - `serve_model.py` - creates a ray serve deployment using the checkpoint
 
+How to run the application:
+ - go/aws to get your aws credentials -- make sure to set these so that you (and the remote jobs) can access S3
+ - `uvicorn server:app --reload` to run the server
+ - then go to `localhost:8000/docs` on your browser to get an interface to test the APIs
+
+
+
  TODOs:
   - [ ] Make sure the model is actually being trained
-  - [ ] Make sure I can query the model properly
+    - [ ] We should consider migrating to Dreambooth instead to get a better personalization demo.
+  - [x] Make sure I can query the model properly
     - [x] Querying a fake model locally and rendering the right output
     - [x] Querying a fake model remotely and rendering the right output
-    - [ ] Querying a real model remotely and rendering the right output
-    - [ ] Querying any model remotely and rendering the right output
-  - [ ] Deploying models
+    - [x] Querying a real model remotely and rendering the right output
+    - [x] Querying any model remotely and rendering the right output
+  - [ ] Miscellanous
     - [ ] Right now there's tar and zip; we should just standardize
     - [ ] Move the service.py out of service/ so that we can use the utils
     - [ ] Right now there's no good way of allowing this service to connect to s3 (for training upload)
