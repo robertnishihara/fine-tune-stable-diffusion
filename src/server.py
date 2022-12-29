@@ -32,6 +32,12 @@ app = FastAPI()
 
 s3_dir = "s3://anyscale-temp/diffusion-demo"
 
+AWS_ACCESS_VARS = {
+    "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+    "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+    "AWS_SESSION_TOKEN": os.environ["AWS_SESSION_TOKEN"],
+}
+
 
 def validate_model_path(model_path, post_training=False):
     if not model_path.startswith("s3://"):
@@ -76,9 +82,7 @@ def submit_training_job(job_name, data_path, model_path):
             "AWS_ACCESS_KEY_ID needs to be set in the environment. "
         )
     runtime_env.update({
-        "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
-        "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
-        "AWS_SESSION_TOKEN": os.environ["AWS_SESSION_TOKEN"],
+        "env_vars": AWS_ACCESS_VARS,
     })
 
     job_config.update({
@@ -115,6 +119,7 @@ def submit_service(model_id, model_path, local=False):
         validate_model_path(model_path, post_training=True)
         sdk = AnyscaleSDK()
         # current_dir = os.path.dirname(os.path.abspath(__file__))
+        print("Submitting service for model_path: ", model_path)
         response = sdk.apply_service(
             create_production_service=CreateProductionService(
                 name=f"stable-diffusion-{model_id}",
@@ -129,8 +134,12 @@ def submit_service(model_id, model_path, local=False):
                     # https://console.anyscale-staging.com/o/anyscale-internal/configurations/app-config-details/bld_hu28yb4llwb66fxh3cd9dzh9ty
                     build_id="bld_hu28yb4llwb66fxh3cd9dzh9ty",
                     runtime_env=dict(
-                        working_dir="https://github.com/robertnishihara/fine-tune-stable-diffusion/archive/refs/heads/main.zip",
-                        env_vars=dict(RANDOM=str(uuid.uuid4()), MODEL_PATH=model_path),
+                        working_dir="https://github.com/robertnishihara/fine-tune-stable-diffusion/archive/refs/heads/training-fix.zip",
+                        env_vars=dict(
+                            RANDOM=str(uuid.uuid4()),
+                            MODEL_PATH=model_path,
+                            **AWS_ACCESS_VARS
+                        ),
                     ),
                     entrypoint="serve run --non-blocking src.service.serve_model:entrypoint",
                     access="public",
@@ -161,17 +170,19 @@ async def deploy(model_id: str, model_path: Optional[str] = None):
 
     result = submit_service(model_id, model_path, local=local)
     with ServingDBClient(model=model_id) as db:
-        db["url"] = result.url
-        db["service_id"] = str(result.id)
-        db["service_name"] = str(result.name)
-        db["token"] = get_service_token(result.id)
         print("URL: ", result.url)
         print("service_id", result.id)
         print("service_name", str(result.name))
         print("Token: ", get_service_token(result.id))
+
+        db["url"] = str(result.url)
+        db["service_id"] = str(result.id)
+        db["service_name"] = str(result.name)
+        db["token"] = get_service_token(result.id)
     return {
-        "message": "Deployed model successfully!",
+        "message": f"Deployed model ({model_path}) successfully!",
         "model_id": model_id,
+        "service_id": result.id,
         "model_url": result.url,
     }
 
